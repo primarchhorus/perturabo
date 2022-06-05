@@ -26,46 +26,67 @@
  */
 
 
-#include <util/buffer.hpp>
-#include <util/log.hpp>
-#include <topic.hpp>
+#include "util/buffer.hpp"
+#include "util/log.hpp"
+#include "topic.hpp"
+#include "topic_manager.hpp"
+
+#include <json/single_include/nlohmann/json.hpp>
+
 #include <iostream>
 #include <unistd.h>
 #include <memory>
 #include <thread>
+#include <chrono>
+
 
 struct test_type {
     int thingy;
 };
 
-message_bus::topic<test_type> new_topic;
+message_bus::topic_manager manager;
+std::atomic<bool> data_ready(false);
+std::atomic<bool> stop(false);
 
-void insert() {
-    for (int i = 0; i < 1000000; i++) {
-        std::shared_ptr<test_type> n = std::make_unique<test_type>();
-        n->thingy = i;
-        std::cout << "insert " << n->thingy << std::endl;
-        new_topic.push_event(n);
+
+void insert(int timeout) {
+    
+
+    std::string t_name = "test_topic";
+    auto topic = manager.get_topic(t_name);
+
+    long sum = 0;
+    for (int i = 0; i < 100000; i++) {
+        nlohmann::json j;
+        j["thingy"] = i;
+        j["message"] = "message thingy";
+        j["state"] = true;
+        j["timeout"] = timeout;
+        topic->send_message(j);
+        sum = sum + i;
+        usleep(10);
     }
+    std::cout << "insert thread " << std::this_thread::get_id() << ": " << sum << std::endl;
 }
 
-void recieve() {
-    usleep(10000);
-    while (!new_topic.get_queue_state()) {
-        auto recv_handle = new_topic.pop_event();
-        std::cout << "recieve " << recv_handle->thingy << std::endl;
-        usleep(100);
-    }
+void run() {
+    manager.create_topic("test_topic", 8096);
+    auto topic = manager.get_topic("test_topic");
+    std::thread th1(insert, 1); 
+    std::thread th2(insert, 2); 
+    std::thread th3(insert, 3); 
+    std::thread th4(insert, 4); 
+    std::thread th5(insert, 5); 
+    th1.join();
+    th2.join();
+    th3.join();
+    th4.join();
+    th5.join();
+    topic->stop();
+    
 }
 
 int main(int argc, char *argv[]) {
-
-    
-    std::thread th1(insert); 
-    std::thread th2(recieve);  
-    th1.join();
-  
-    // Wait for thread t2 to finish
-    th2.join();
+    run();
     return 0;
 }

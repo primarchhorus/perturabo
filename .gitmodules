@@ -1,0 +1,18 @@
+[submodule "cereal"]
+	path = cereal
+	url = https://github.com/USCiLab/cereal.git
+[submodule "bitsery"]
+	path = bitsery
+	url = https://github.com/fraillt/bitsery.git
+[submodule "libnop"]
+	path = libnop
+	url = https://github.com/google/libnop.git
+[submodule "json_struct"]
+	path = json_struct
+	url = https://github.com/jorgen/json_struct.git
+[submodule "json11"]
+	path = json11
+	url = https://github.com/dropbox/json11.git
+[submodule "json"]
+	path = json
+	url = https://github.com/nlohmann/json.git

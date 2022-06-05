@@ -38,6 +38,7 @@
 #include <mutex>
 #include <vector>
 
+
 namespace util {
 /**
  * @brief Handles threaded data buffers to read data from the External FIFO.
@@ -59,7 +60,7 @@ typedef std::lock_guard<lock_type> lock_guard;
  * @brief The buffer types.
  */
 template<typename T> using buffer_value_type = T;
-template<typename T> using buffer_value_ptr_type = T*;
+template<typename T> using buffer_value_ptr_type = buffer_value_type<T>*;
 template<typename T> using buffer_type = std::vector<T>;
 template<typename T> using buffer_ptr_type = buffer_type<T>*;
 template<typename T> using handle_type = std::shared_ptr<buffer_type<T>>;
@@ -81,9 +82,11 @@ struct pool {
     ~pool();
 
     void create(const size_t number, const size_t size);
+    void create_val_pool(const size_t number_, const size_t size_);
     void destroy();
 
     handle request();
+    value_handle request_val_handle();
 
     bool valid() const {
         return number != 0;
@@ -105,12 +108,18 @@ struct pool {
     size_t size;
 
     void output(std::ostream& out);
+    std::condition_variable ready;
+    std::mutex ready_mtx;
+    std::atomic_bool message_ready;
 
 private:
     struct releaser {
         pool& pool_;
         releaser(pool& pool__) : pool_(pool__) {}
         void operator()(buffer* buf) const {
+            pool_.release(buf);
+        }
+        void operator()(value* buf) const {
             pool_.release(buf);
         }
     };
@@ -124,6 +133,7 @@ private:
     std::forward_list<value_ptr> values;
 
     lock_type lock;
+    
 };
 
 /**
@@ -140,6 +150,9 @@ struct queue {
 
     using handles = std::list<handle>;
     using value_handles = std::list<value_handle>;
+
+    std::condition_variable     pool_condition_active;
+    std::mutex                  mtx;
 
     queue();
     queue(const queue& que);
@@ -208,6 +221,23 @@ void pool<T>::create(const size_t number_, const size_t size_) {
 }
 
 template<typename T>
+void pool<T>::create_val_pool(const size_t number_, const size_t size_) {
+    lock_guard guard(lock);
+    if (valid()) {
+        throw error("pool is already created");
+    }
+    number = number_;
+    size = size_;
+    for (size_t n = 0; n < number; ++n) {
+        value_ptr buf = new value;
+        values.push_front(buf);
+    }
+    count_ = number;
+    message_ready = true;
+    ready.notify_one();
+}
+
+template<typename T>
 void pool<T>::destroy() {
     lock_guard guard(lock);
     if (number > 0) {
@@ -218,6 +248,11 @@ void pool<T>::destroy() {
             buffer_ptr buf = buffers.front();
             delete buf;
             buffers.pop_front();
+        }
+        while (!values.empty()) {
+            value_ptr buf = values.front();
+            delete buf;
+            values.pop_front();
         }
         number = 0;
         size = 0;
@@ -238,10 +273,39 @@ handle_type<T> pool<T>::request() {
 }
 
 template<typename T>
+handle_value_type<T> pool<T>::request_val_handle() {
+    lock_guard guard(lock);
+    std::unique_lock<std::mutex> pool_ready(ready_mtx);
+    ready.wait_for(pool_ready, std::chrono::milliseconds(100), [this]{ return message_ready.load(); });
+
+    if (empty()) {
+        message_ready = false;
+        throw error("no message object available");
+    }
+    count_--;
+    if (count_ < 10) {
+        message_ready = false;
+    }
+    
+    value_ptr buf = values.front();
+    values.pop_front();
+    return value_handle(buf, releaser(*this));
+}
+
+template<typename T>
 void pool<T>::release(buffer_ptr buf) {
     buf->clear();
     lock_guard guard(lock);
     buffers.push_front(buf);
+    count_++;
+}
+
+template<typename T>
+void pool<T>::release(value_ptr buf) {
+    lock_guard guard(lock);
+    values.push_front(buf);
+    message_ready = true;
+    ready.notify_one();
     count_++;
 }
 
@@ -273,12 +337,11 @@ void queue<T>::push(handle buf) {
 
 template<typename T>
 void queue<T>::push(value_handle val) {
-    
     lock_guard guard(lock);
     values.push_back(val);
+    pool_condition_active.notify_all();
     size_ += sizeof(val);
     ++count_;
-    
 }
 
 template<typename T>

@@ -1,5 +1,5 @@
 BUILD_DIR ?= ../build
-OBJDIR = $(BUILD_DIR)/sodern
+OBJDIR = $(BUILD_DIR)/perturabo
 
 # OS support
 os = $(shell uname)
@@ -18,11 +18,11 @@ CC = c++
 DEPFLAGS = -MT $@ -MMD -MP -MF $(patsubst %.o,%.d,$@)
 
 # define any compile-time flags
-CFLAGS = -Wall -g $(DEPFLAGS)
+CFLAGS = -Wall -g -w -std=c++17 $(DEPFLAGS)
 
 # define any directories containing header files other than /usr/include
 #
-INCLUDES = -I.. -I.
+INCLUDES = -I.. -I. 
 
 # define library paths in addition to /usr/lib
 #   if I wanted to include libraries not in /usr/lib I'd specify
@@ -56,7 +56,7 @@ SRCS = \
 OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 
 # define the executable file
-EXE = pubsub
+EXE = perturabo
 
 #
 # The following part of the makefile is generic; it can be used to
