@@ -19,6 +19,7 @@
  */
 
 #include "topic.hpp"
+#include "event.hpp"
 
 #include <json/single_include/nlohmann/json.hpp>
 
@@ -29,23 +30,26 @@
 
 namespace message_bus
 {
+    template<class T>
     struct topic_manager {
 
         void create_topic(std::string topic_name, size_t topic_pool_size);
-
-        std::shared_ptr<message_bus::topic> get_topic(std::string topic_name);
+        
+        std::shared_ptr<message_bus::topic<T>> get_topic(std::string topic_name);
 
         private:
-            std::map<std::string, std::shared_ptr<message_bus::topic>> topics;
+            std::map<std::string, std::shared_ptr<message_bus::topic<T>>> topics;
 
     };
   
-    void topic_manager::create_topic(std::string topic_name, size_t topic_pool_size) {
-        std::shared_ptr<message_bus::topic> new_topic = std::make_shared<message_bus::topic>();
+    template<typename T>
+    void topic_manager<T>::create_topic(std::string topic_name, size_t topic_pool_size) {
+        std::shared_ptr<message_bus::topic<T>> new_topic = std::make_shared<message_bus::topic<T>>(topic_pool_size);
         topics.emplace(std::make_pair(topic_name, new_topic));
     }
    
-    std::shared_ptr<message_bus::topic> topic_manager::get_topic(std::string topic_name) {
+    template<typename T>
+    std::shared_ptr<message_bus::topic<T>> topic_manager<T>::get_topic(std::string topic_name) {
         auto search = topics.find(topic_name);
         if (search != topics.end()) {
             return search->second;

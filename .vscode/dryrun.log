@@ -1,7 +1,7 @@
-make.exe --dry-run --always-make --keep-going --print-directory
-'\\wsl$\Ubuntu-20.04\home\ben\pub_sub'
-CMD.EXE was started with the above path as the current directory.
-UNC paths are not supported.  Defaulting to Windows directory.
-'make.exe' is not recognized as an internal or external command,
-operable program or batch file.
-
+make --dry-run --keep-going --print-directory
+make: Entering directory `/Users/benjamingarner/perturabo'
+c++ -Wall -g -w -std=c++20 -MT ../build/perturabo/main.o -MMD -MP -MF ../build/perturabo/main.d -I.. -I.  -c main.cpp  -o ../build/perturabo/main.o
+ 
+c++ -Wall -g -w -std=c++20 -MT ../build/perturabo/perturabo -MMD -MP -MF ../build/perturabo/perturabo -I.. -I.  -o ../build/perturabo/perturabo ../build/perturabo/main.o ../build/perturabo/log.o  
+make: Leaving directory `/Users/benjamingarner/perturabo'
+ 

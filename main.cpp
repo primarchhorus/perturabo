@@ -39,12 +39,12 @@
 #include <thread>
 #include <chrono>
 
-
+template<typename T> using tmap = std::map<std::string, T>;
 struct test_type {
     int thingy;
 };
 
-message_bus::topic_manager manager;
+message_bus::topic_manager<nlohmann::json> manager;
 std::atomic<bool> data_ready(false);
 std::atomic<bool> stop(false);
 
@@ -56,37 +56,53 @@ void insert(int timeout) {
     auto topic = manager.get_topic(t_name);
 
     long sum = 0;
-    for (int i = 0; i < 100000; i++) {
+    while (sum < 200000) {
         nlohmann::json j;
-        j["thingy"] = i;
+        j["thingy"] = sum;
         j["message"] = "message thingy";
-        j["state"] = true;
+        j["thread_id"] = timeout;
         j["timeout"] = timeout;
         topic->send_message(j);
-        sum = sum + i;
-        usleep(10);
+        sum = sum + 1;
+         std::this_thread::sleep_for(std::chrono::microseconds(16660));
     }
     std::cout << "insert thread " << std::this_thread::get_id() << ": " << sum << std::endl;
+}
+
+void game_loop() {
+    std::string t_name = "test_topic";
+    auto topic = manager.get_topic(t_name);
+    int frame_count = 0;
+    while(frame_count < 200000) {
+        std::this_thread::sleep_for(std::chrono::microseconds(16660));
+        topic->trigger();
+        std::cout << "frame " << frame_count << std::endl;
+        frame_count +=1;
+    }
+    
 }
 
 void run() {
     manager.create_topic("test_topic", 8096);
     auto topic = manager.get_topic("test_topic");
-    std::thread th1(insert, 1); 
-    std::thread th2(insert, 2); 
-    std::thread th3(insert, 3); 
-    std::thread th4(insert, 4); 
-    std::thread th5(insert, 5); 
+    std::thread frame(game_loop);
+    std::thread th1(insert, 0); 
+    std::thread th2(insert, 1); 
+    std::thread th3(insert, 2); 
+    std::thread th4(insert, 3); 
+    std::thread th5(insert, 4); 
+
     th1.join();
     th2.join();
     th3.join();
     th4.join();
     th5.join();
+    frame.join();
     topic->stop();
     
 }
 
 int main(int argc, char *argv[]) {
     run();
-    return 0;
+ 
 }

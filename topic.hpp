@@ -29,25 +29,45 @@
 #include <tuple>
 #include <memory>
 #include <thread>
+#include <type_traits>
 
 namespace message_bus {
-    using topic_buffer_value = util::buffer::buffer_value_type<nlohmann::json>;
-    using topic_buffer_value_ptr = util::buffer::buffer_value_ptr_type<nlohmann::json>;
-    using topic_buffer = util::buffer::buffer_type<nlohmann::json>;
-    using topic_value = util::buffer::handle_value_type<nlohmann::json>;
-    using topic_handle = util::buffer::handle_type<nlohmann::json>;
-    using topic_pool = util::buffer::pool<nlohmann::json>;
-    using topic_queue = util::buffer::queue<nlohmann::json>;
+        // template<typename T> using topic_buffer_value = util::buffer::buffer_value_type<T>;
+        // template<typename T> using topic_buffer_value_ptr = util::buffer::buffer_value_ptr_type<T>;
+        // template<typename T> using topic_buffer = util::buffer::buffer_type<T>;
+        // template<typename T> using topic_value = util::buffer::handle_value_type<T>;
+        // template<typename T> using topic_handle = util::buffer::handle_type<T>;
+        // template<typename T> using topic_pool = util::buffer::pool<T>;
+        // template<typename T> using topic_queue = util::buffer::queue<T>;
 
-    struct topic_base {}; 
+    int retry_max = 5;
 
-    struct topic : topic_base{
+    enum run_mode {
+        stream,
+        trigger
+    };
 
-        topic() : process_running(false), process_finished(true) {
-            /*
-            * add the size values to the construction later
-            */
-            topic_message_pool.create_val_pool(2048, 1024);
+    // template<typename T> using topic_map = std::map<std::string, std::shared_ptr<message_bus::topic<T>>>;
+    
+    struct topic_base {
+        // virtual             ~topic_base() {};
+        // // virtual void        run() = 0;
+        // // virtual void        start() = 0;
+        // virtual void        stop() = 0;
+        // // virtual void        request_val() = 0;
+        // // virtual void        push_event( ) = 0;
+        // virtual void        send_message() = 0;
+        // // virtual void pop_event() = 0;
+        // // virtual bool        get_queue_state() = 0;
+        // virtual void        trigger() = 0;
+
+    }; 
+
+    template<typename T>
+    struct topic {
+
+        topic(size_t buffer_size) : process_running(false), process_finished(true) {
+            topic_message_pool.create_val_pool(buffer_size, buffer_size);
             start();
             
         };
@@ -57,44 +77,41 @@ namespace message_bus {
             }
         };
 
-        void                        run();
-        void                        start();
-        void                        stop();
-
-        topic_value                 request_val();
-
-        void                        push_event(topic_value event);
-
-        void                        send_message(nlohmann::json j);
-
-        topic_value                 pop_event();
-
-        bool                        get_queue_state();
-
-        topic_pool                  topic_message_pool;
-        topic_queue                 topic_message_queue;
-        std::condition_variable     cond;
-        std::mutex                  mtx;
+        void                            run();
+        void                            start();
+        void                            stop();
+        util::buffer::handle_value_type<T>                     request_val();
+        void                            push_event(util::buffer::handle_value_type<T> event);
+        void                            send_message(T j);
+        util::buffer::handle_value_type<T>                     pop_event();
+        bool                            get_queue_state();
+        void                            trigger();
 
         protected:
-            std::atomic_bool process_running;
-            std::atomic_bool process_finished;
-            std::thread process_thread;
-        // std::thread                 process_thread;
+            util::buffer::pool<T>                  topic_message_pool;
+            util::buffer::queue<T>                 topic_message_queue;
+            std::condition_variable     cond;
+            std::mutex                  mtx;
+            std::atomic_bool            process_running;
+            std::atomic_bool            process_finished;
+            std::thread                 process_thread;
+            run_mode                    mode;
         
     };
 
-    void topic::start() {
+    template<typename T>
+    void topic<T>::start() {
         auto is_running = process_running.exchange(true);
         if (is_running || !process_finished.load()) {
-            throw std::runtime_error("LM windowing consumer reading already running");
+            throw std::runtime_error("topic all ready running");
         }
         process_finished = false;
         process_running = true;
         process_thread = std::thread(&topic::run, this);
     }
 
-    void topic::stop() {
+    template<typename T>
+    void topic<T>::stop() {
         while(!get_queue_state()) {
             std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
@@ -102,39 +119,48 @@ namespace message_bus {
         std::cout << "stop called " << process_running.load() << std::endl;
     }
 
-    void topic::run() {
-        
+    template<class T>
+    void topic<T>::run() {
+        int count[5] = {0,0,0,0,0};
         long sum = 0;
         do {
             if (!process_running.load()) {
                 break;
             }
             if(!get_queue_state()) {
-                topic_value handle = pop_event();
-                sum = sum + handle->at("thingy").get<int>();
+                util::buffer::handle_value_type<T> handle = pop_event();
+                sum = sum + handle->at("thingy").template get<int>();
+                int thread_id = handle->at("thread_id").template get<int>();
+                count[thread_id] = sum;
+                std::cout << thread_id << " recieve " << handle->at("thingy").template get<int>() << std::endl;
             } 
         }while(true);
-        std::cout << "receive: " << sum << std::endl;
+        for(int i = 0; i < 5; i++) {
+            std::cout << "final receive: " << count[i] << std::endl;
+        }
         process_finished = true;
+
     }
 
-    topic_value topic::request_val() {
+    template<typename T>
+    util::buffer::handle_value_type<T> topic<T>::request_val() {
         return topic_message_pool.request_val_handle();
     }
 
-
-    void topic::push_event(topic_value event) {
+    template<typename T>
+    void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
         topic_message_queue.push(event);
-        cond.notify_one();
+        // cond.notify_one();
     }
 
-    void topic::send_message(nlohmann::json j) {
+    template<typename T>
+    void topic<T>::send_message(T j) {
         bool retry = false;
-        message_bus::topic_value handle;
+        int retry_counter = 0;
+        util::buffer::handle_value_type<T> handle;
         do {
             try
             {
-                std::cout << "insert " << j["thingy"] << std::endl;
                 handle = request_val();
                 retry = false;
                 *handle = j;
@@ -145,6 +171,9 @@ namespace message_bus {
             {
                 std::cout << e.what() << std::endl;
                 retry = true;
+                retry_counter += 1;
+                if (retry_counter > retry_max) 
+                    throw std::runtime_error("retry on message send exceeded max");
                 cond.notify_one();
             }
             catch(const std::exception &e)
@@ -155,19 +184,69 @@ namespace message_bus {
         
     }
 
-
-    topic_value topic::pop_event() {
+    template<class T>
+    util::buffer::handle_value_type<T> topic<T>::pop_event() {
         std::unique_lock<std::mutex> L(mtx);
-        std::cout << "pop " << process_running.load() << " " << get_queue_state() << std::endl;
-        // possibly change to no timeout, but may cause an hang, tbd.
+        // possibly change to no timeout, but may cause a hang, tbd.
         cond.wait_for(L, std::chrono::milliseconds(3000), [this]{ return !get_queue_state() || !process_running.load(); });
-        std::cout << "after cond " << (!process_running.load() && get_queue_state()) << std::endl;
         return topic_message_queue.pop_val();
     }
 
-
-    bool topic::get_queue_state() {
+    template<class T>
+    bool topic<T>::get_queue_state() {
         return topic_message_queue.empty();
     }
+
+    template<class T>
+    void topic<T>::trigger() {
+        cond.notify_one();
+    }
+
+    // template<typename T>
+    // struct is_int
+    // {
+    // static bool const val = false;
+    // };
+
+    // template<>
+    // struct is_int<int>
+    // {
+    // static bool const val = true;
+    // };
+
+    // void fun(std::map<std::string, std::any> obj)
+    // {
+    //     std::map<std::string, std::any>::iterator it = obj.begin();
+    //      while (it != obj.end())
+    //     {
+    //         if (it->second.type() == typeid(int)) {
+    //             std::cout << "int" << std::endl;
+    //         }
+
+    //         if (it->second.type() == typeid(const char[11])) {
+    //             std::cout << "char" << std::endl;
+    //         }
+
+    //         if (it->second.type() == typeid(std::string)) {
+    //             std::cout << "string" << std::endl;
+    //         }
+
+    //         if (it->second.type() == typeid(double)) {
+    //             std::cout << "double" << std::endl;
+    //         }
+
+    //         if (it->second.type() == typeid(float)) {
+    //             std::cout << "float" << std::endl;
+    //         }
+
+    //         if (it->second.type() == typeid(bool)) {
+    //             std::cout << "bool" << std::endl;
+    //         }
+
+    //         it++;
+    //     }
+    // // std::cout << (obj.type() == typeid(int)) << std::endl;
+    // }
+
 }  // namespace message
 #endif  // TOPIC_H
