@@ -44,7 +44,9 @@ namespace message_bus
   
     template<typename T>
     void topic_manager<T>::create_topic(std::string topic_name, size_t topic_pool_size) {
-        std::shared_ptr<message_bus::topic<T>> new_topic = std::make_shared<message_bus::topic<T>>(topic_pool_size);
+        
+        std::shared_ptr<message_bus::topic<T>> new_topic = 
+        std::make_shared<message_bus::topic<T>>(topic_pool_size, message_bus::run_mode::stream);
         topics.emplace(std::make_pair(topic_name, new_topic));
     }
    

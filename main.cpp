@@ -30,6 +30,7 @@
 #include "util/log.hpp"
 #include "topic.hpp"
 #include "topic_manager.hpp"
+#include "event.hpp"
 
 #include <json/single_include/nlohmann/json.hpp>
 
@@ -44,10 +45,13 @@ struct test_type {
     int thingy;
 };
 
-message_bus::topic_manager<nlohmann::json> manager;
+message_bus::topic_manager<message_bus::event_base> manager;
 std::atomic<bool> data_ready(false);
 std::atomic<bool> stop(false);
 
+int count[5] = {0,0,0,0,0};
+long sum = 0;
+int loop_count = 200000;
 
 void insert(int timeout) {
     
@@ -56,49 +60,64 @@ void insert(int timeout) {
     auto topic = manager.get_topic(t_name);
 
     long sum = 0;
-    while (sum < 200000) {
-        nlohmann::json j;
-        j["thingy"] = sum;
-        j["message"] = "message thingy";
-        j["thread_id"] = timeout;
-        j["timeout"] = timeout;
+    while (sum < loop_count) {
+        message_bus::event_base j;
+        j.message = std::string("message thingy");
+        j.event_id = timeout;
+        j.incr = sum;
         topic->send_message(j);
         sum = sum + 1;
-         std::this_thread::sleep_for(std::chrono::microseconds(16660));
     }
     std::cout << "insert thread " << std::this_thread::get_id() << ": " << sum << std::endl;
 }
 
-void game_loop() {
+void trigger_loop() {
     std::string t_name = "test_topic";
     auto topic = manager.get_topic(t_name);
     int frame_count = 0;
-    while(frame_count < 200000) {
+    while(frame_count <= loop_count) {
         std::this_thread::sleep_for(std::chrono::microseconds(16660));
         topic->trigger();
         std::cout << "frame " << frame_count << std::endl;
         frame_count +=1;
     }
-    
+}
+
+void handler(std::shared_ptr<message_bus::event_base> message) {
+    sum = sum + message->event_id;
+    int thread_id = message->event_id;
+    std::cout << thread_id << " recieve " << message->incr << std::endl;
+
 }
 
 void run() {
-    manager.create_topic("test_topic", 8096);
+    manager.create_topic("test_topic", 65536);
     auto topic = manager.get_topic("test_topic");
-    std::thread frame(game_loop);
-    std::thread th1(insert, 0); 
-    std::thread th2(insert, 1); 
-    std::thread th3(insert, 2); 
-    std::thread th4(insert, 3); 
-    std::thread th5(insert, 4); 
+    std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
+    topic->register_handler(f);
+  
+    std::thread th1(insert, 1); 
+    std::thread th2(insert, 2); 
+    std::thread th3(insert, 3); 
+    std::thread th4(insert, 4); 
+    std::thread th5(insert, 5); 
+    std::thread th6(insert, 6);
+    std::thread th7(insert, 7);
+    std::thread th8(insert, 8);
+    std::thread th9(insert, 9);
 
     th1.join();
     th2.join();
     th3.join();
     th4.join();
     th5.join();
-    frame.join();
+    th6.join();
+    th7.join();
+    th8.join();
+    th9.join();
+   
     topic->stop();
+    std::cout << "sum " << sum << std::endl;
     
 }
 

@@ -232,7 +232,6 @@ void pool<T>::create_val_pool(const size_t number_, const size_t size_) {
     for (size_t n = 0; n < number; ++n) {
         value_ptr buf = new value;
         values.push_front(buf);
-        // ::new(&data[n]) value_ptr;
     }
     count_ = number;
     message_ready = true;

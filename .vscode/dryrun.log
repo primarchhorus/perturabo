@@ -1,7 +1,8 @@
-make --dry-run --keep-going --print-directory
+make --dry-run --always-make --keep-going --print-directory
 make: Entering directory `/Users/benjamingarner/perturabo'
+mkdir -p ../build/perturabo
 c++ -Wall -g -w -std=c++20 -MT ../build/perturabo/main.o -MMD -MP -MF ../build/perturabo/main.d -I.. -I.  -c main.cpp  -o ../build/perturabo/main.o
- 
+c++ -Wall -g -w -std=c++20 -MT ../build/perturabo/log.o -MMD -MP -MF ../build/perturabo/log.d -I.. -I.  -c util/log.cpp  -o ../build/perturabo/log.o
 c++ -Wall -g -w -std=c++20 -MT ../build/perturabo/perturabo -MMD -MP -MF ../build/perturabo/perturabo -I.. -I.  -o ../build/perturabo/perturabo ../build/perturabo/main.o ../build/perturabo/log.o  
 make: Leaving directory `/Users/benjamingarner/perturabo'
  

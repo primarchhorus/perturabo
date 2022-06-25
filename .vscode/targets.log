@@ -8,10 +8,9 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This program built for i386-apple-darwin11.3.0
  
 
-# Make data base, printed on Fri Jun 17 21:13:26 2022
+# Make data base, printed on Sat Jun 25 16:18:16 2022
 
 # Variables
- 
 
 # automatic
 <D = $(patsubst %/,%,$(dir $<))
@@ -52,7 +51,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 INFOPATH = /opt/homebrew/share/info:
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/d0/0tjq_wz975g6l4n0xzhdj8d00000gn/T/vscode-ipc-ac86b260-6d33-468f-9327-accc174bd8ad.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/d0/0tjq_wz975g6l4n0xzhdj8d00000gn/T/vscode-ipc-97d886ff-6c00-4fb3-84e9-e6992a950ec7.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -88,7 +87,7 @@ HOME = /Users/benjamingarner
 # default
 MAKEFILEPATH = $(shell /usr/bin/xcode-select -print-path 2>/dev/null || echo /Developer)/Makefiles
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/benjamingarner/Library/Application Support/Code/CachedData/4af164ea3a06f701fe3e89a2bcbb421d2026b68f
+VSCODE_CODE_CACHE_PATH = /Users/benjamingarner/Library/Application Support/Code/CachedData/30d9c6cd9483b2cc586687151bcbcd635f373630
 # environment
 LOGNAME = benjamingarner
 # environment
@@ -130,7 +129,7 @@ TMPDIR = /var/folders/d0/0tjq_wz975g6l4n0xzhdj8d00000gn/T/
 # automatic
 *F = $(notdir $*)
 # environment
-VSCODE_IPC_HOOK = /Users/benjamingarner/Library/Application Support/Code/1.68.0-main.sock
+VSCODE_IPC_HOOK = /Users/benjamingarner/Library/Application Support/Code/1.68.1-main.sock
 # makefile
 MAKEFLAGS = Rrqp
 # environment
@@ -138,7 +137,7 @@ MFLAGS = -Rrqp
 # automatic
 *D = $(patsubst %/,%,$(dir $*))
 # environment
-XPC_SERVICE_NAME = application.com.microsoft.VSCode.15284549.15284555
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.16012108.16012114
 # environment
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
@@ -161,7 +160,6 @@ OBJDIR = $(BUILD_DIR)/perturabo
 LC_ALL = C
 # makefile (from `Makefile', line 34)
 LIBS = $(OS_LIBS)
- 
 # automatic
 ^F = $(notdir $^)
 # default
@@ -173,9 +171,9 @@ os = $(shell uname)
 # environment
 LANG = C
 # environment
-VSCODE_PID = 75610
+VSCODE_PID = 4697
 # variable set hash-table stats:
-# Load=80/1024=8%, Rehash=0, Collisions=10/142=7%
+# Load=80/1024=8%, Rehash=0, Collisions=10/136=7%
 
 # Pattern-specific Variable Values
 
@@ -183,11 +181,10 @@ VSCODE_PID = 75610
 
 # Directories
 
-# util/../build/perturabo: could not be stat'd.
 # . (device 16777232, inode 14281281): 19 files, no impossibilities.
 # util (device 16777232, inode 14281361): 5 files, no impossibilities.
 
-# 24 files, no impossibilities in 3 directories.
+# 24 files, no impossibilities in 2 directories.
 
 # Implicit Rules
 
@@ -205,9 +202,9 @@ all: ../build/perturabo ../build/perturabo/perturabo
 #  Implicit rule search has been done.
 #  File does not exist.
 #  File has been updated.
-#  Needs to be updated (-q is set).
+#  Successfully updated.
 # variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/6=0%
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 json/single_include/nlohmann/json.hpp:
 #  Implicit rule search has been done.
@@ -224,7 +221,7 @@ json/single_include/nlohmann/json.hpp:
 
 util/buffer.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-11 22:57:29
+#  Last modified 2022-06-25 12:31:15
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -239,7 +236,7 @@ util/buffer.hpp:
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-17 21:13:24
+#  Last modified 2022-06-24 15:00:52
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -247,11 +244,11 @@ Makefile:
 
 ../build/perturabo/perturabo: ../build/perturabo/main.o ../build/perturabo/log.o
 #  Implicit rule search has not been done.
-#  Last modified 2022-06-16 20:40:58
+#  Last modified 2022-06-25 13:51:45
 #  File has been updated.
-#  Needs to be updated (-q is set).
+#  Successfully updated.
 # variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/6=0%
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 #  commands to execute (from `Makefile', line 75):
 	$(CC) $(CFLAGS) $(INCLUDES) -o $(OBJDIR)/$(EXE) $(OBJS) $(LFLAGS) $(LIBS)
 	
@@ -260,7 +257,7 @@ Makefile:
 ../build/perturabo/main.d:
 #  A default, MAKEFILES, or -include/sinclude makefile.
 #  Implicit rule search has been done.
-#  Last modified 2022-06-17 20:41:42
+#  Last modified 2022-06-25 13:51:45
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -268,14 +265,17 @@ Makefile:
 
 # Not a target:
 util/log.cpp:
-#  Implicit rule search has not been done.
-#  Modification time never checked.
-#  File has not been updated.
+#  Implicit rule search has been done.
+#  Last modified 2022-05-29 18:29:19
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # Not a target:
 main.cpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-17 20:40:24
+#  Last modified 2022-06-25 13:50:07
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -301,7 +301,7 @@ util/log.hpp:
 
 event.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-12 19:23:43
+#  Last modified 2022-06-24 16:30:56
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -310,34 +310,18 @@ event.hpp:
 # Not a target:
 .DEFAULT:
 #  Implicit rule search has not been done.
+ 
 #  Modification time never checked.
 #  File has not been updated.
 
-../build/perturabo/main.o: main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
+../build/perturabo/main.o: main.cpp main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
 #  Implicit rule search has been done.
 #  Implicit/static pattern stem: `main'
-#  File does not exist.
+#  Last modified 2022-06-25 13:51:45
 #  File has been updated.
-#  Needs to be updated (-q is set).
-# automatic
-# @ := ../build/perturabo/main.o
-# automatic
-# % := 
-# automatic
-# * := main
-# automatic
-# + := main.cpp main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
-# automatic
-# | := 
-# automatic
-# < := main.cpp
-# automatic
-# ^ := main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
-# automatic
- 
-# ? := main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
+#  Successfully updated.
 # variable set hash-table stats:
-# Load=8/32=25%, Rehash=0, Collisions=1/18=6%
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 #  commands to execute (from `Makefile', line 82):
 	$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@
 	
@@ -353,20 +337,27 @@ clean:
 
 topic.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-17 09:37:15
+#  Last modified 2022-06-25 13:48:40
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
-../build/perturabo/log.o: util/log.cpp util/log.hpp
-#  Implicit rule search has not been done.
-#  Modification time never checked.
-#  File has not been updated.
+../build/perturabo/log.o: util/log.cpp util/log.cpp util/log.hpp
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `log'
+#  Last modified 2022-05-29 21:05:43
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 82):
+	$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@
+	
 
 topic_manager.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-17 20:41:36
+#  Last modified 2022-06-25 13:51:42
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -374,7 +365,7 @@ topic_manager.hpp:
 
 ../build/perturabo:
 #  Implicit rule search has not been done.
-#  Last modified 2022-06-17 20:41:42
+#  Last modified 2022-06-25 13:51:45
 #  File has been updated.
 #  Successfully updated.
 #  commands to execute (from `Makefile', line 72):
@@ -382,7 +373,7 @@ topic_manager.hpp:
 	
 
 # files hash-table stats:
-# Load=20/1024=2%, Rehash=0, Collisions=0/56=0%
+# Load=20/1024=2%, Rehash=0, Collisions=0/64=0%
 # VPATH Search Paths
 
 # No `vpath' search paths.
@@ -395,6 +386,6 @@ topic_manager.hpp:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4036 / max = 4036 / min = 4036 / avg = 4036
 
-# Finished Make data base on Fri Jun 17 21:13:26 2022
+# Finished Make data base on Sat Jun 25 16:18:16 2022
 
  

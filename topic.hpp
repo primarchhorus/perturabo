@@ -32,41 +32,18 @@
 #include <type_traits>
 
 namespace message_bus {
-        // template<typename T> using topic_buffer_value = util::buffer::buffer_value_type<T>;
-        // template<typename T> using topic_buffer_value_ptr = util::buffer::buffer_value_ptr_type<T>;
-        // template<typename T> using topic_buffer = util::buffer::buffer_type<T>;
-        // template<typename T> using topic_value = util::buffer::handle_value_type<T>;
-        // template<typename T> using topic_handle = util::buffer::handle_type<T>;
-        // template<typename T> using topic_pool = util::buffer::pool<T>;
-        // template<typename T> using topic_queue = util::buffer::queue<T>;
 
-    int retry_max = 5;
+    int retry_max = 100;
 
     enum run_mode {
         stream,
         trigger
     };
 
-    // template<typename T> using topic_map = std::map<std::string, std::shared_ptr<message_bus::topic<T>>>;
-    
-    struct topic_base {
-        // virtual             ~topic_base() {};
-        // // virtual void        run() = 0;
-        // // virtual void        start() = 0;
-        // virtual void        stop() = 0;
-        // // virtual void        request_val() = 0;
-        // // virtual void        push_event( ) = 0;
-        // virtual void        send_message() = 0;
-        // // virtual void pop_event() = 0;
-        // // virtual bool        get_queue_state() = 0;
-        // virtual void        trigger() = 0;
-
-    }; 
-
     template<typename T>
     struct topic {
 
-        topic(size_t buffer_size) : process_running(false), process_finished(true) {
+        topic(size_t buffer_size, run_mode mode_) : process_running(false), process_finished(true), mode(mode_) {
             topic_message_pool.create_val_pool(buffer_size, buffer_size);
             start();
             
@@ -77,25 +54,27 @@ namespace message_bus {
             }
         };
 
-        void                            run();
-        void                            start();
-        void                            stop();
-        util::buffer::handle_value_type<T>                     request_val();
-        void                            push_event(util::buffer::handle_value_type<T> event);
-        void                            send_message(T j);
-        util::buffer::handle_value_type<T>                     pop_event();
-        bool                            get_queue_state();
-        void                            trigger();
+        void                                        run();
+        void                                        start();
+        void                                        stop();
+        util::buffer::handle_value_type<T>          request_val();
+        void                                        push_event(util::buffer::handle_value_type<T> event);
+        void                                        send_message(T j);
+        util::buffer::handle_value_type<T>          pop_event();
+        bool                                        get_queue_state();
+        void                                        trigger();
+        void                                        register_handler(std::function<void(util::buffer::handle_value_type<T>  handler)>);
 
         protected:
-            util::buffer::pool<T>                  topic_message_pool;
-            util::buffer::queue<T>                 topic_message_queue;
-            std::condition_variable     cond;
-            std::mutex                  mtx;
-            std::atomic_bool            process_running;
-            std::atomic_bool            process_finished;
-            std::thread                 process_thread;
-            run_mode                    mode;
+            util::buffer::pool<T>                   topic_message_pool;
+            util::buffer::queue<T>                  topic_message_queue;
+            std::condition_variable                 cond;
+            std::mutex                              mtx;
+            std::atomic_bool                        process_running;
+            std::atomic_bool                        process_finished;
+            std::thread                             process_thread;
+            run_mode                                mode;
+            std::vector<std::function<void(util::buffer::handle_value_type<T> )>> func_list;
         
     };
 
@@ -121,25 +100,18 @@ namespace message_bus {
 
     template<class T>
     void topic<T>::run() {
-        int count[5] = {0,0,0,0,0};
-        long sum = 0;
         do {
             if (!process_running.load()) {
                 break;
             }
             if(!get_queue_state()) {
                 util::buffer::handle_value_type<T> handle = pop_event();
-                sum = sum + handle->at("thingy").template get<int>();
-                int thread_id = handle->at("thread_id").template get<int>();
-                count[thread_id] = sum;
-                std::cout << thread_id << " recieve " << handle->at("thingy").template get<int>() << std::endl;
+                for(auto func: func_list) {
+                    func(handle);
+                }
             } 
         }while(true);
-        for(int i = 0; i < 5; i++) {
-            std::cout << "final receive: " << count[i] << std::endl;
-        }
         process_finished = true;
-
     }
 
     template<typename T>
@@ -150,7 +122,9 @@ namespace message_bus {
     template<typename T>
     void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
         topic_message_queue.push(event);
-        // cond.notify_one();
+        if(mode == run_mode::stream) {
+            cond.notify_one();
+        }
     }
 
     template<typename T>
@@ -165,7 +139,7 @@ namespace message_bus {
                 retry = false;
                 *handle = j;
                 push_event(handle);
-                std::this_thread::sleep_for(std::chrono::microseconds(j["timeout"]));
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
             catch(const std::runtime_error &e)
             {
@@ -202,51 +176,10 @@ namespace message_bus {
         cond.notify_one();
     }
 
-    // template<typename T>
-    // struct is_int
-    // {
-    // static bool const val = false;
-    // };
-
-    // template<>
-    // struct is_int<int>
-    // {
-    // static bool const val = true;
-    // };
-
-    // void fun(std::map<std::string, std::any> obj)
-    // {
-    //     std::map<std::string, std::any>::iterator it = obj.begin();
-    //      while (it != obj.end())
-    //     {
-    //         if (it->second.type() == typeid(int)) {
-    //             std::cout << "int" << std::endl;
-    //         }
-
-    //         if (it->second.type() == typeid(const char[11])) {
-    //             std::cout << "char" << std::endl;
-    //         }
-
-    //         if (it->second.type() == typeid(std::string)) {
-    //             std::cout << "string" << std::endl;
-    //         }
-
-    //         if (it->second.type() == typeid(double)) {
-    //             std::cout << "double" << std::endl;
-    //         }
-
-    //         if (it->second.type() == typeid(float)) {
-    //             std::cout << "float" << std::endl;
-    //         }
-
-    //         if (it->second.type() == typeid(bool)) {
-    //             std::cout << "bool" << std::endl;
-    //         }
-
-    //         it++;
-    //     }
-    // // std::cout << (obj.type() == typeid(int)) << std::endl;
-    // }
+    template<class T>
+    void topic<T>::register_handler(std::function<void(util::buffer::handle_value_type<T> )> handler) {
+        func_list.push_back(std::function<void(util::buffer::handle_value_type<T>)>(handler));
+    }
 
 }  // namespace message
 #endif  // TOPIC_H
