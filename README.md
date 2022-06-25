@@ -1,6 +1,6 @@
 # perturabo
 C++ messaging system
 
-Borrowing a few concepts from embedded buffering, kafka topics and mqtt pub sub.
+Borrowing a few concepts from embedded buffering, kafka topics/mqtt pub sub type stuff.
 
-Will start as a inter service messaging sysyem based on registering functions and branch out to include tcp connection and ability to run as a stand alone server.
+Start of as a event style message sytem based on registering functions, single header include and branch out to be more of a distrubted thing if i can be bothered.
