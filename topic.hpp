@@ -59,7 +59,8 @@ namespace message_bus {
         void                                        stop();
         util::buffer::handle_value_type<T>          request_val();
         void                                        push_event(util::buffer::handle_value_type<T> event);
-        void                                        send_message(T j);
+        void                                        push_event(util::buffer::handle_value_type<T> event, run_mode mode);
+        void                                        send_message(T &j);
         util::buffer::handle_value_type<T>          pop_event();
         bool                                        get_queue_state();
         void                                        trigger();
@@ -68,7 +69,8 @@ namespace message_bus {
         protected:
             util::buffer::pool<T>                   topic_message_pool;
             util::buffer::queue<T>                  topic_message_queue;
-            std::condition_variable                 cond;
+            std::condition_variable                 object_in_queue;
+            std::condition_variable                 object_in_pool;
             std::mutex                              mtx;
             std::atomic_bool                        process_running;
             std::atomic_bool                        process_finished;
@@ -95,22 +97,21 @@ namespace message_bus {
             std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
         process_running = false;
-        std::cout << "stop called " << process_running.load() << std::endl;
     }
 
     template<class T>
     void topic<T>::run() {
-        do {
-            if (!process_running.load()) {
+        std::unique_lock<std::mutex> L(mtx);
+        while(!process_finished) {
+            object_in_queue.wait_for(L, std::chrono::milliseconds(100), [this]{ return !topic_message_queue.empty(); });
+            if (!process_running.load()) { // This sucks evaluating this each ieration but not sure of a better way out, blah blah compiler complier, still though.
                 break;
             }
-            if(!get_queue_state()) {
-                util::buffer::handle_value_type<T> handle = pop_event();
-                for(auto func: func_list) {
-                    func(handle);
-                }
-            } 
-        }while(true);
+            util::buffer::handle_value_type<T> handle = pop_event();
+            for(auto func: func_list) {
+                func(handle);
+            }
+        };
         process_finished = true;
     }
 
@@ -123,12 +124,20 @@ namespace message_bus {
     void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
         topic_message_queue.push(event);
         if(mode == run_mode::stream) {
-            cond.notify_one();
+            object_in_queue.notify_one();
         }
     }
 
     template<typename T>
-    void topic<T>::send_message(T j) {
+    void topic<T>::push_event(util::buffer::handle_value_type<T> event, run_mode mode) {
+        topic_message_queue.push(event);
+        if(mode == run_mode::stream) {
+            object_in_queue.notify_one();
+        }
+    }
+
+    template<typename T>
+    void topic<T>::send_message(T &j) {
         bool retry = false;
         int retry_counter = 0;
         util::buffer::handle_value_type<T> handle;
@@ -139,16 +148,16 @@ namespace message_bus {
                 retry = false;
                 *handle = j;
                 push_event(handle);
-                std::this_thread::sleep_for(std::chrono::microseconds(50));
+                if(mode == run_mode::stream) {
+                    std::this_thread::sleep_for(std::chrono::microseconds(20));
+                }
             }
-            catch(const std::runtime_error &e)
+            catch(const int &e)
             {
-                std::cout << e.what() << std::endl;
+                std::unique_lock<std::mutex> pool_ready(mtx);
+                object_in_pool.wait_for(pool_ready, std::chrono::microseconds(10), [this]{ return !topic_message_pool.empty();});
                 retry = true;
                 retry_counter += 1;
-                if (retry_counter > retry_max) 
-                    throw std::runtime_error("retry on message send exceeded max");
-                cond.notify_one();
             }
             catch(const std::exception &e)
             {
@@ -160,9 +169,6 @@ namespace message_bus {
 
     template<class T>
     util::buffer::handle_value_type<T> topic<T>::pop_event() {
-        std::unique_lock<std::mutex> L(mtx);
-        // possibly change to no timeout, but may cause a hang, tbd.
-        cond.wait_for(L, std::chrono::milliseconds(3000), [this]{ return !get_queue_state() || !process_running.load(); });
         return topic_message_queue.pop_val();
     }
 
@@ -173,7 +179,7 @@ namespace message_bus {
 
     template<class T>
     void topic<T>::trigger() {
-        cond.notify_one();
+        object_in_queue.notify_one();
     }
 
     template<class T>

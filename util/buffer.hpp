@@ -111,7 +111,7 @@ struct pool {
     std::condition_variable ready;
     std::mutex ready_mtx;
     std::atomic_bool message_ready;
-    std::aligned_storage_t<sizeof(T), alignof(T)> data[8096];
+    // std::aligned_storage_t<sizeof(T), alignof(T)> data[8096];
 
 private:
     struct releaser {
@@ -153,6 +153,7 @@ struct queue {
     using value_handles = std::list<value_handle>;
 
     std::condition_variable     pool_condition_active;
+    std::atomic_bool            pool_ready;
     std::mutex                  mtx;
 
     queue();
@@ -209,7 +210,7 @@ template<typename T>
 void pool<T>::create(const size_t number_, const size_t size_) {
     lock_guard guard(lock);
     if (valid()) {
-        throw error("pool is already created");
+        throw -1;
     }
     number = number_;
     size = size_;
@@ -225,7 +226,7 @@ template<typename T>
 void pool<T>::create_val_pool(const size_t number_, const size_t size_) {
     lock_guard guard(lock);
     if (valid()) {
-        throw error("pool is already created");
+        throw -1;
     }
     number = number_;
     size = size_;
@@ -276,21 +277,13 @@ handle_type<T> pool<T>::request() {
 template<typename T>
 handle_value_type<T> pool<T>::request_val_handle() {
     lock_guard guard(lock);
-    std::unique_lock<std::mutex> pool_ready(ready_mtx);
-    ready.wait_for(pool_ready, std::chrono::milliseconds(100), [this]{ return message_ready.load(); });
-
     if (empty()) {
-        message_ready = false;
-        throw error("no message object available");
+        throw -1;
     }
     count_--;
-    if (count_ < 10) {
-        message_ready = false;
-    }
-    
-    value_ptr buf = values.front();
+    value_ptr val = values.front();
     values.pop_front();
-    return value_handle(buf, releaser(*this));
+    return value_handle(val, releaser(*this));
 }
 
 template<typename T>
@@ -341,6 +334,7 @@ void queue<T>::push(value_handle val) {
     lock_guard guard(lock);
     values.push_back(val);
     pool_condition_active.notify_all();
+    pool_ready = true;
     size_ += sizeof(val);
     ++count_;
 }

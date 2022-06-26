@@ -24,9 +24,8 @@
 #include <string>
 
 namespace message_bus {
-    const int message_size = 16;
     struct alignas(64) event_base {
-        std::string message;
+        char message[16];
         int event_id;
         int incr;
         bool handled;

@@ -50,8 +50,9 @@ std::atomic<bool> data_ready(false);
 std::atomic<bool> stop(false);
 
 int count[5] = {0,0,0,0,0};
-long sum = 0;
-int loop_count = 200000;
+std::atomic<long long> final_sum{0};
+std::atomic<long long> check{0};
+int loop_count = 100000;
 
 void insert(int timeout) {
     
@@ -60,15 +61,17 @@ void insert(int timeout) {
     auto topic = manager.get_topic(t_name);
 
     long sum = 0;
-    while (sum < loop_count) {
+    long counter = 0;
+    while (sum <= loop_count) {
+        check.fetch_add(sum);
         message_bus::event_base j;
-        j.message = std::string("message thingy");
+        strcpy(j.message, "message thingy");
         j.event_id = timeout;
         j.incr = sum;
         topic->send_message(j);
         sum = sum + 1;
+        counter = counter + timeout;
     }
-    std::cout << "insert thread " << std::this_thread::get_id() << ": " << sum << std::endl;
 }
 
 void trigger_loop() {
@@ -84,14 +87,12 @@ void trigger_loop() {
 }
 
 void handler(std::shared_ptr<message_bus::event_base> message) {
-    sum = sum + message->event_id;
+    final_sum.fetch_add(message->incr);
     int thread_id = message->event_id;
-    std::cout << thread_id << " recieve " << message->incr << std::endl;
-
 }
 
 void run() {
-    manager.create_topic("test_topic", 65536);
+    manager.create_topic("test_topic", 4);
     auto topic = manager.get_topic("test_topic");
     std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
     topic->register_handler(f);
@@ -117,11 +118,9 @@ void run() {
     th9.join();
    
     topic->stop();
-    std::cout << "sum " << sum << std::endl;
-    
+    std::cout << "receive sum " << final_sum.load() << " send sum " << check.load() << std::endl;
 }
 
 int main(int argc, char *argv[]) {
     run();
- 
 }

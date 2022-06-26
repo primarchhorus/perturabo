@@ -6,9 +6,8 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
- 
 
-# Make data base, printed on Sat Jun 25 16:18:16 2022
+# Make data base, printed on Sun Jun 26 10:32:34 2022
 
 # Variables
 
@@ -51,7 +50,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 INFOPATH = /opt/homebrew/share/info:
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/d0/0tjq_wz975g6l4n0xzhdj8d00000gn/T/vscode-ipc-97d886ff-6c00-4fb3-84e9-e6992a950ec7.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/d0/0tjq_wz975g6l4n0xzhdj8d00000gn/T/vscode-ipc-f39ec903-6763-462a-992e-32eae8e32467.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -171,7 +170,7 @@ os = $(shell uname)
 # environment
 LANG = C
 # environment
-VSCODE_PID = 4697
+VSCODE_PID = 53388
 # variable set hash-table stats:
 # Load=80/1024=8%, Rehash=0, Collisions=10/136=7%
 
@@ -221,7 +220,7 @@ json/single_include/nlohmann/json.hpp:
 
 util/buffer.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-25 12:31:15
+#  Last modified 2022-06-25 22:45:16
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -244,7 +243,7 @@ Makefile:
 
 ../build/perturabo/perturabo: ../build/perturabo/main.o ../build/perturabo/log.o
 #  Implicit rule search has not been done.
-#  Last modified 2022-06-25 13:51:45
+#  Last modified 2022-06-25 22:48:48
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -257,7 +256,7 @@ Makefile:
 ../build/perturabo/main.d:
 #  A default, MAKEFILES, or -include/sinclude makefile.
 #  Implicit rule search has been done.
-#  Last modified 2022-06-25 13:51:45
+#  Last modified 2022-06-25 22:48:48
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -275,7 +274,7 @@ util/log.cpp:
 # Not a target:
 main.cpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-25 13:50:07
+#  Last modified 2022-06-25 22:24:49
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -300,6 +299,7 @@ util/log.hpp:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 event.hpp:
+ 
 #  Implicit rule search has been done.
 #  Last modified 2022-06-24 16:30:56
 #  File has been updated.
@@ -310,14 +310,13 @@ event.hpp:
 # Not a target:
 .DEFAULT:
 #  Implicit rule search has not been done.
- 
 #  Modification time never checked.
 #  File has not been updated.
 
 ../build/perturabo/main.o: main.cpp main.cpp util/buffer.hpp util/log.hpp topic.hpp json/single_include/nlohmann/json.hpp topic_manager.hpp event.hpp
 #  Implicit rule search has been done.
 #  Implicit/static pattern stem: `main'
-#  Last modified 2022-06-25 13:51:45
+#  Last modified 2022-06-25 22:48:48
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -337,7 +336,7 @@ clean:
 
 topic.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-25 13:48:40
+#  Last modified 2022-06-25 22:48:44
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -365,7 +364,7 @@ topic_manager.hpp:
 
 ../build/perturabo:
 #  Implicit rule search has not been done.
-#  Last modified 2022-06-25 13:51:45
+#  Last modified 2022-06-25 22:48:48
 #  File has been updated.
 #  Successfully updated.
 #  commands to execute (from `Makefile', line 72):
@@ -386,6 +385,6 @@ topic_manager.hpp:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4036 / max = 4036 / min = 4036 / avg = 4036
 
-# Finished Make data base on Sat Jun 25 16:18:16 2022
+# Finished Make data base on Sun Jun 26 10:32:34 2022
 
  
