@@ -15,21 +15,20 @@
  */
 
 /** @file message.h
- * @brief Defines the object that encapsulates a "event" is inteneded to be a base class that users can inherit from to add there own member variables or methods.
+ * @brief Defines the object that encapsulates a "event" is inteneded to be a
+ * base class that users can inherit from to add there own member variables or
+ * methods.
  */
 
 #ifndef EVENT_H
 #define EVENT_H
 
-#include <string>
-
 namespace message_bus {
-    struct alignas(64) event_base {
-        char message[16];
-        int event_id;
-        int incr;
-        bool handled;
-    };
-
-}  // namespace message
-#endif  // TOPIC_H
+struct alignas(64) event_base {
+  char message[16];
+  int event_id;
+  int incr;
+  bool handled;
+};
+} // namespace message_bus
+#endif // TOPIC_H

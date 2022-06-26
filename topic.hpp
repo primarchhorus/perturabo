@@ -15,7 +15,8 @@
  */
 
 /** @file topic.h
- * @brief Defines the object that encapsulates a "topic" that producers send to and consumers get from via the populator and the notifier respectively.
+ * @brief Defines the object that encapsulates a "topic" that producers send to
+ * and consumers get from via the populator and the notifier respectively.
  */
 
 #ifndef TOPIC_H
@@ -25,167 +26,156 @@
 
 #include <json/single_include/nlohmann/json.hpp>
 
-#include <mutex>
-#include <tuple>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <tuple>
 #include <type_traits>
 
 namespace message_bus {
 
-    int retry_max = 100;
+int retry_max = 100;
 
-    enum run_mode {
-        stream,
-        trigger
-    };
+enum run_mode { stream, trigger };
 
-    template<typename T>
-    struct topic {
+template <typename T> struct topic {
 
-        topic(size_t buffer_size, run_mode mode_) : process_running(false), process_finished(true), mode(mode_) {
-            topic_message_pool.create_val_pool(buffer_size, buffer_size);
-            start();
-            
-        };
-        ~topic() {
-            if (process_thread.joinable()) {
-                process_thread.join();
-            }
-        };
-
-        void                                        run();
-        void                                        start();
-        void                                        stop();
-        util::buffer::handle_value_type<T>          request_val();
-        void                                        push_event(util::buffer::handle_value_type<T> event);
-        void                                        push_event(util::buffer::handle_value_type<T> event, run_mode mode);
-        void                                        send_message(T &j);
-        util::buffer::handle_value_type<T>          pop_event();
-        bool                                        get_queue_state();
-        void                                        trigger();
-        void                                        register_handler(std::function<void(util::buffer::handle_value_type<T>  handler)>);
-
-        protected:
-            util::buffer::pool<T>                   topic_message_pool;
-            util::buffer::queue<T>                  topic_message_queue;
-            std::condition_variable                 object_in_queue;
-            std::condition_variable                 object_in_pool;
-            std::mutex                              mtx;
-            std::atomic_bool                        process_running;
-            std::atomic_bool                        process_finished;
-            std::thread                             process_thread;
-            run_mode                                mode;
-            std::vector<std::function<void(util::buffer::handle_value_type<T> )>> func_list;
-        
-    };
-
-    template<typename T>
-    void topic<T>::start() {
-        auto is_running = process_running.exchange(true);
-        if (is_running || !process_finished.load()) {
-            throw std::runtime_error("topic all ready running");
-        }
-        process_finished = false;
-        process_running = true;
-        process_thread = std::thread(&topic::run, this);
+  topic(size_t buffer_size, run_mode mode_)
+      : process_running(false), process_finished(true), mode(mode_) {
+    topic_message_pool.create_val_pool(buffer_size, buffer_size);
+    start();
+  };
+  ~topic() {
+    if (process_thread.joinable()) {
+      process_thread.join();
     }
+  };
 
-    template<typename T>
-    void topic<T>::stop() {
-        while(!get_queue_state()) {
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
-        }
-        process_running = false;
+  void run();
+  void start();
+  void stop();
+  util::buffer::handle_value_type<T> request_val();
+  void push_event(util::buffer::handle_value_type<T> event);
+  void push_event(util::buffer::handle_value_type<T> event, run_mode mode);
+  void send_message(T &j);
+  util::buffer::handle_value_type<T> pop_event();
+  bool get_queue_state();
+  void trigger();
+  void register_handler(
+      std::function<void(util::buffer::handle_value_type<T> handler)>);
+
+protected:
+  util::buffer::pool<T> topic_message_pool;
+  util::buffer::queue<T> topic_message_queue;
+  std::condition_variable object_in_queue;
+  std::condition_variable object_in_pool;
+  std::mutex mtx;
+  std::atomic_bool process_running;
+  std::atomic_bool process_finished;
+  std::thread process_thread;
+  run_mode mode;
+  std::vector<std::function<void(util::buffer::handle_value_type<T>)>>
+      func_list;
+};
+
+template <typename T> void topic<T>::start() {
+  auto is_running = process_running.exchange(true);
+  if (is_running || !process_finished.load()) {
+    throw std::runtime_error("topic all ready running");
+  }
+  process_finished = false;
+  process_running = true;
+  process_thread = std::thread(&topic::run, this);
+}
+
+template <typename T> void topic<T>::stop() {
+  while (!get_queue_state()) {
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
+  process_running = false;
+}
+
+template <class T> void topic<T>::run() {
+  std::unique_lock<std::mutex> L(mtx);
+  while (!process_finished) {
+    object_in_queue.wait_for(L, std::chrono::milliseconds(100),
+                             [this] { return !topic_message_queue.empty(); });
+    if (!process_running.load()) { // This sucks evaluating this each ieration
+                                   // but not sure of a better way out, blah
+                                   // blah compiler complier, still though.
+      break;
     }
-
-    template<class T>
-    void topic<T>::run() {
-        std::unique_lock<std::mutex> L(mtx);
-        while(!process_finished) {
-            object_in_queue.wait_for(L, std::chrono::milliseconds(100), [this]{ return !topic_message_queue.empty(); });
-            if (!process_running.load()) { // This sucks evaluating this each ieration but not sure of a better way out, blah blah compiler complier, still though.
-                break;
-            }
-            util::buffer::handle_value_type<T> handle = pop_event();
-            for(auto func: func_list) {
-                func(handle);
-            }
-        };
-        process_finished = true;
+    util::buffer::handle_value_type<T> handle = pop_event();
+    for (auto func : func_list) {
+      func(handle);
     }
+  };
+  process_finished = true;
+}
 
-    template<typename T>
-    util::buffer::handle_value_type<T> topic<T>::request_val() {
-        return topic_message_pool.request_val_handle();
+template <typename T>
+util::buffer::handle_value_type<T> topic<T>::request_val() {
+  return topic_message_pool.request_val_handle();
+}
+
+template <typename T>
+void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
+  topic_message_queue.push(event);
+  if (mode == run_mode::stream) {
+    object_in_queue.notify_one();
+  }
+}
+
+template <typename T>
+void topic<T>::push_event(util::buffer::handle_value_type<T> event,
+                          run_mode mode) {
+  topic_message_queue.push(event);
+  if (mode == run_mode::stream) {
+    object_in_queue.notify_one();
+  }
+}
+
+template <typename T> void topic<T>::send_message(T &j) {
+  bool retry = false;
+  int retry_counter = 0;
+  util::buffer::handle_value_type<T> handle;
+  do {
+    try { // try vs if, compare later, bool if possibly quicker but only if exception is thrown alot, and thst only with a very low pool size and very fast push rate, bad config really
+      handle = request_val();
+      retry = false;
+      *handle = j;
+      push_event(handle);
+      if (mode == run_mode::stream) {
+        std::this_thread::sleep_for(std::chrono::microseconds(20));
+      }
+    } catch (const int &e) {
+      std::unique_lock<std::mutex> pool_ready(mtx);
+      object_in_pool.wait_for(pool_ready, std::chrono::microseconds(10),
+                              [this] { return !topic_message_pool.empty(); });
+      retry = true;
+      retry_counter += 1;
+    } catch (const std::exception &e) {
+      std::cout << e.what() << std::endl;
     }
+  } while (retry);
+}
 
-    template<typename T>
-    void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
-        topic_message_queue.push(event);
-        if(mode == run_mode::stream) {
-            object_in_queue.notify_one();
-        }
-    }
+template <class T> util::buffer::handle_value_type<T> topic<T>::pop_event() {
+  return topic_message_queue.pop_val();
+}
 
-    template<typename T>
-    void topic<T>::push_event(util::buffer::handle_value_type<T> event, run_mode mode) {
-        topic_message_queue.push(event);
-        if(mode == run_mode::stream) {
-            object_in_queue.notify_one();
-        }
-    }
+template <class T> bool topic<T>::get_queue_state() {
+  return topic_message_queue.empty();
+}
 
-    template<typename T>
-    void topic<T>::send_message(T &j) {
-        bool retry = false;
-        int retry_counter = 0;
-        util::buffer::handle_value_type<T> handle;
-        do {
-            try
-            {
-                handle = request_val();
-                retry = false;
-                *handle = j;
-                push_event(handle);
-                if(mode == run_mode::stream) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(20));
-                }
-            }
-            catch(const int &e)
-            {
-                std::unique_lock<std::mutex> pool_ready(mtx);
-                object_in_pool.wait_for(pool_ready, std::chrono::microseconds(10), [this]{ return !topic_message_pool.empty();});
-                retry = true;
-                retry_counter += 1;
-            }
-            catch(const std::exception &e)
-            {
-                std::cout << e.what() << std::endl;
-            }
-        }while(retry);
-        
-    }
+template <class T> void topic<T>::trigger() { object_in_queue.notify_one(); }
 
-    template<class T>
-    util::buffer::handle_value_type<T> topic<T>::pop_event() {
-        return topic_message_queue.pop_val();
-    }
+template <class T>
+void topic<T>::register_handler(
+    std::function<void(util::buffer::handle_value_type<T>)> handler) {
+  func_list.push_back(
+      std::function<void(util::buffer::handle_value_type<T>)>(handler));
+}
 
-    template<class T>
-    bool topic<T>::get_queue_state() {
-        return topic_message_queue.empty();
-    }
-
-    template<class T>
-    void topic<T>::trigger() {
-        object_in_queue.notify_one();
-    }
-
-    template<class T>
-    void topic<T>::register_handler(std::function<void(util::buffer::handle_value_type<T> )> handler) {
-        func_list.push_back(std::function<void(util::buffer::handle_value_type<T>)>(handler));
-    }
-
-}  // namespace message
-#endif  // TOPIC_H
+} // namespace message_bus
+#endif // TOPIC_H
