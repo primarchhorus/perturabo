@@ -330,7 +330,7 @@ template <typename T> void queue<T>::copy(value &to) {
    * If the `to` size is 0 copy all the available data
    */
 
-  copy_unprotected(to, count);
+  copy_unprotected(to, sizeof(*to));
 }
 
 template <typename T>

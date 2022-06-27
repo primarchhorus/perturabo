@@ -43,7 +43,7 @@ message_bus::topic_manager<message_bus::event_base> manager;
 
 std::atomic<long long> final_sum{0};
 std::atomic<long long> check{0};
-int loop_count = 100000;
+int loop_count = 1000000;
 
 void insert(int timeout) {
   std::string t_name = "test_topic";
@@ -51,13 +51,13 @@ void insert(int timeout) {
 
   long sum = 0;
   long counter = 0;
-  while (sum <= loop_count) {
-    check.fetch_add(sum);
-    message_bus::event_base j;
-    strcpy(j.message, "message thingy");
-    j.event_id = timeout;
-    j.incr = sum;
-    topic->send_message(j);
+  while (sum < loop_count) {
+    check.fetch_add(1);
+    auto event_handle = topic->get_topic_event_handle();
+    strcpy(event_handle->message, "message thingy");
+    event_handle->event_id = timeout;
+    event_handle->incr = 1;
+    topic->send_message(event_handle);
     sum = sum + 1;
     counter = counter + timeout;
   }
@@ -81,11 +81,11 @@ void handler(std::shared_ptr<message_bus::event_base> message) {
 }
 
 void run() {
-  manager.create_topic("test_topic", 65536, message_bus::run_mode::stream);
+  manager.create_topic("test_topic", 4096, message_bus::run_mode::stream);
   auto topic = manager.get_topic("test_topic");
   std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
   topic->register_handler(f);
-
+  auto start = std::chrono::system_clock::now();
   std::thread th1(insert, 1);
   std::thread th2(insert, 2);
   std::thread th3(insert, 3);
@@ -95,6 +95,7 @@ void run() {
   std::thread th7(insert, 7);
   std::thread th8(insert, 8);
   std::thread th9(insert, 9);
+  std::thread th10(insert, 10);
 
   th1.join();
   th2.join();
@@ -105,10 +106,13 @@ void run() {
   th7.join();
   th8.join();
   th9.join();
+  th10.join();
 
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> diff = end - start;
   topic->stop();
   std::cout << "receive sum " << final_sum.load() << " send sum "
-            << check.load() << " percent receieved: " << (100 * (  check.load() / final_sum.load())) << "%" <<std::endl;
+            << check.load() << " percent receieved: " << (100 * (  check.load() / final_sum.load())) << "% " << " messages per second: " << final_sum.load() / diff.count() << std::endl;
 }
 
 int main(int argc, char *argv[]) { run(); }

@@ -26,12 +26,12 @@
 
 #include <json/single_include/nlohmann/json.hpp>
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <tuple>
 #include <type_traits>
-#include <condition_variable>
 
 namespace message_bus {
 
@@ -46,6 +46,7 @@ template <typename T> struct topic {
     topic_message_pool.create_val_pool(buffer_size, buffer_size);
     start();
   };
+  topic(const topic &) = delete;
   ~topic() {
     if (process_thread.joinable()) {
       process_thread.join();
@@ -60,7 +61,8 @@ template <typename T> struct topic {
   util::buffer::handle_value_type<T> request_val();
   void push_event(util::buffer::handle_value_type<T> event);
   void push_event(util::buffer::handle_value_type<T> event, run_mode mode);
-  void send_message(T &j);
+  util::buffer::handle_value_type<T> get_topic_event_handle();
+  void send_message(util::buffer::handle_value_type<T> j);
   util::buffer::handle_value_type<T> pop_event();
   bool get_queue_state();
   void trigger();
@@ -103,7 +105,7 @@ template <class T> void topic<T>::run() {
   while (!process_finished) {
     object_in_queue.wait_for(L, std::chrono::milliseconds(100),
                              [this] { return !topic_message_queue.empty(); });
-    if (!process_running.load()) { // This sucks evaluating this each ieration
+    if (!process_running.load()) { // This sucks evaluating this each iteration
                                    // but not sure of a better way out, blah
                                    // blah compiler complier, still though.
       break;
@@ -138,29 +140,33 @@ void topic<T>::push_event(util::buffer::handle_value_type<T> event,
   }
 }
 
-template <typename T> void topic<T>::send_message(T &j) {
+template <typename T>
+util::buffer::handle_value_type<T> topic<T>::get_topic_event_handle() {
   bool retry = false;
   int retry_counter = 0;
-  util::buffer::handle_value_type<T> handle;
   do {
-    try { // try vs if, compare later, bool if possibly quicker but only if exception is thrown alot, and thst only with a very low pool size and very fast push rate, bad config really
-      handle = request_val();
-      retry = false;
-      *handle = j;
-      push_event(handle);
-      if (mode == run_mode::stream) {
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
-      }
-    } catch (const int &e) {
-      std::unique_lock<std::mutex> pool_ready(mtx);
-      object_in_pool.wait_for(pool_ready, std::chrono::microseconds(10),
-                              [this] { return !topic_message_pool.empty(); });
-      retry = true;
-      retry_counter += 1;
-    } catch (const std::exception &e) {
-      std::cout << e.what() << std::endl;
-    }
-  } while (retry);
+  try { // try vs if, compare later, bool if possibly quicker but only if
+        // exception is thrown alot, and thst only with a very low pool size and
+        // very fast push rate, bad config really
+    return request_val();
+  } catch (const int &e) {
+    std::unique_lock<std::mutex> pool_ready(mtx);
+    object_in_pool.wait_for(pool_ready, std::chrono::microseconds(2000),
+                            [this] { return !topic_message_pool.empty(); });
+    retry = true;
+    retry_counter += 1;
+  } catch (const std::exception &e) {
+    std::cout << e.what() << std::endl;
+  }
+  }while(retry);
+}
+
+template <typename T>
+void topic<T>::send_message(util::buffer::handle_value_type<T> j) {
+  push_event(j);
+  if (mode == run_mode::stream) {
+    std::this_thread::sleep_for(std::chrono::microseconds(1));
+  }
 }
 
 template <class T> util::buffer::handle_value_type<T> topic<T>::pop_event() {
