@@ -31,6 +31,7 @@
 #include <thread>
 #include <tuple>
 #include <type_traits>
+#include <condition_variable>
 
 namespace message_bus {
 
@@ -49,6 +50,8 @@ template <typename T> struct topic {
     if (process_thread.joinable()) {
       process_thread.join();
     }
+    topic_message_queue.flush();
+    topic_message_pool.destroy();
   };
 
   void run();
@@ -146,7 +149,7 @@ template <typename T> void topic<T>::send_message(T &j) {
       *handle = j;
       push_event(handle);
       if (mode == run_mode::stream) {
-        std::this_thread::sleep_for(std::chrono::microseconds(20));
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
       }
     } catch (const int &e) {
       std::unique_lock<std::mutex> pool_ready(mtx);

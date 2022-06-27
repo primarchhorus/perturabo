@@ -143,6 +143,7 @@ template <typename T> struct queue {
   value_handle pop_val();
 
   void copy(buffer &to);
+  void copy(value &to);
   void copy(buffer_value_ptr to, const size_t count);
 
   void compact();
@@ -158,6 +159,7 @@ template <typename T> struct queue {
 
 private:
   void copy_unprotected(buffer_value_ptr to, const size_t count);
+  void copy_unprotected(value to, const size_t count);
 
   handles buffers;
   value_handles values;
@@ -322,6 +324,15 @@ template <typename T> void queue<T>::copy(buffer &to) {
   copy_unprotected(to.data(), count);
 }
 
+template <typename T> void queue<T>::copy(value &to) {
+  lock_guard guard(lock);
+  /*
+   * If the `to` size is 0 copy all the available data
+   */
+
+  copy_unprotected(to, count);
+}
+
 template <typename T>
 void queue<T>::copy(buffer_value_ptr to, const size_t count) {
   lock_guard guard(lock);
@@ -333,6 +344,7 @@ void queue<T>::copy_unprotected(buffer_value_ptr to, const size_t count) {
   if (count > size_.load()) {
     throw error("not enough data in queue");
   }
+  std::cout << "copy_unprotected" << std::endl;
   auto to_move = count;
   auto from_bi = buffers.begin();
   while (to_move > 0 && from_bi != buffers.end()) {
@@ -356,6 +368,36 @@ void queue<T>::copy_unprotected(buffer_value_ptr to, const size_t count) {
   }
   if (from_bi != buffers.begin()) {
     buffers.erase(buffers.begin(), from_bi);
+  }
+}
+
+template <typename T>
+void queue<T>::copy_unprotected(value to, const size_t count) {
+  if (count > size_.load()) {
+    throw error("not enough data in queue");
+  }
+  std::cout << "copy_unprotected" << std::endl;
+  auto to_move = count;
+  auto from_bi = values.begin();
+  while (to_move > 0 && from_bi != values.end()) {
+    auto from = *from_bi;
+    if (to_move >= sizeof(*from)) {
+      std::memcpy(&to, from, sizeof(*from) * sizeof(*to));
+      to +=sizeof(*from);
+      to_move -= sizeof(*from);
+      size_ -= sizeof(*from);
+      count_--;
+      from->clear();
+    } else {
+      std::memcpy(&to, sizeof(*from), to_move);
+      to += sizeof(*from);
+      to_move = 0;
+      size_ -= to_move;
+    }
+    from_bi++;
+  }
+  if (from_bi != values.begin()) {
+    values.erase(values.begin(), from_bi);
   }
 }
 
@@ -410,6 +452,7 @@ template <typename T> void queue<T>::compact() {
 template <typename T> void queue<T>::flush() {
   lock_guard guard(lock);
   buffers.clear();
+  values.clear();
 }
 
 template <typename T> void queue<T>::output(std::ostream &out) {

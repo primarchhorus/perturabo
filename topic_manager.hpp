@@ -32,10 +32,20 @@
 namespace message_bus {
 template <class T> struct topic_manager {
 
+  topic_manager () {}
+  ~topic_manager () {
+    auto it = topics.begin();
+    while (it != topics.end()) {
+      it->second->stop();
+      it = topics.erase(it);
+    }
+  }
+
   void create_topic(std::string topic_name, size_t topic_pool_size,
                     message_bus::run_mode topic_mode);
 
   std::shared_ptr<message_bus::topic<T>> get_topic(std::string topic_name);
+  void  remove_topic(std::string topic_name);
 
 private:
   std::map<std::string, std::shared_ptr<message_bus::topic<T>>> topics;

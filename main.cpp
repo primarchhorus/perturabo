@@ -81,9 +81,7 @@ void handler(std::shared_ptr<message_bus::event_base> message) {
 }
 
 void run() {
-    std::cout << sizeof(message_bus::event_base) << std::endl;
-    return;
-  manager.create_topic("test_topic", 2048, message_bus::run_mode::stream);
+  manager.create_topic("test_topic", 65536, message_bus::run_mode::stream);
   auto topic = manager.get_topic("test_topic");
   std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
   topic->register_handler(f);
@@ -110,7 +108,7 @@ void run() {
 
   topic->stop();
   std::cout << "receive sum " << final_sum.load() << " send sum "
-            << check.load() << std::endl;
+            << check.load() << " percent receieved: " << (100 * (  check.load() / final_sum.load())) << "%" <<std::endl;
 }
 
 int main(int argc, char *argv[]) { run(); }
