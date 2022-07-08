@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /*
- * Copyright 2021 XIA LLC, All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-
-/*
- * Apache-2.0 notice:
- *  Changed by Chris Johns. Copyright Chris Johns <chris@contemporary.software>
- */
-
-/** @file log.cpp
- * @brief Implements logging infrastructure components.
  */
 
 #include "event.hpp"
