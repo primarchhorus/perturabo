@@ -32,7 +32,13 @@
 namespace message_bus {
 template <class T> struct topic_manager {
 
-  topic_manager () {}
+  static topic_manager& instance(){
+    static topic_manager instance;
+    return instance;
+  }
+  topic_manager()= default;
+  topic_manager(const topic_manager&)= delete;
+  topic_manager& operator=(const topic_manager&)= delete;
   ~topic_manager () {
     auto it = topics.begin();
     while (it != topics.end()) {

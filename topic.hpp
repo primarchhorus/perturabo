@@ -164,9 +164,9 @@ util::buffer::handle_value_type<T> topic<T>::get_topic_event_handle() {
 template <typename T>
 void topic<T>::send_message(util::buffer::handle_value_type<T> j) {
   push_event(j);
-  if (mode == run_mode::stream) {
-    std::this_thread::sleep_for(std::chrono::microseconds(1));
-  }
+  // if (mode == run_mode::stream) {
+  //   std::this_thread::sleep_for(std::chrono::microseconds(1));
+  // }
 }
 
 template <class T> util::buffer::handle_value_type<T> topic<T>::pop_event() {

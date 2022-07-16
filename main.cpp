@@ -29,15 +29,15 @@
 #include <thread>
 #include <unistd.h>
 
-message_bus::topic_manager<message_bus::event_base> manager;
+using manager = message_bus::topic_manager<message_bus::event_base>;
 
 std::atomic<long long> final_sum{0};
 std::atomic<long long> check{0};
-int loop_count = 1000000;
+int loop_count = 10000000;
 
 void insert(int timeout) {
   std::string t_name = "test_topic";
-  auto topic = manager.get_topic(t_name);
+  auto topic = manager::instance().get_topic(t_name);
 
   long sum = 0;
   long counter = 0;
@@ -55,7 +55,7 @@ void insert(int timeout) {
 
 void trigger_loop() {
   std::string t_name = "test_topic";
-  auto topic = manager.get_topic(t_name);
+  auto topic = manager::instance().get_topic(t_name);
   int frame_count = 0;
   while (frame_count <= loop_count) {
     std::this_thread::sleep_for(std::chrono::microseconds(16660));
@@ -71,8 +71,8 @@ void handler(std::shared_ptr<message_bus::event_base> message) {
 }
 
 void run() {
-  manager.create_topic("test_topic", 4096, message_bus::run_mode::stream);
-  auto topic = manager.get_topic("test_topic");
+  manager::instance().create_topic("test_topic", 4096, message_bus::run_mode::stream);
+  auto topic = manager::instance().get_topic("test_topic");
   std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
   topic->register_handler(f);
   auto start = std::chrono::system_clock::now();

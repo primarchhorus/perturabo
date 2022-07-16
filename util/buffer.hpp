@@ -38,6 +38,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <deque>
 
 namespace util {
 /**
@@ -114,8 +115,8 @@ private:
 
   std::atomic_size_t count_;
 
-  std::forward_list<buffer_ptr> buffers;
-  std::forward_list<value_ptr> values;
+  std::deque<buffer_ptr> buffers;
+  std::deque<value_ptr> values;
 
   lock_type lock;
 };
@@ -131,8 +132,8 @@ template <typename T> struct queue {
   using handle = handle_type<T>;
   using value_handle = handle_value_type<T>;
 
-  using handles = std::list<handle>;
-  using value_handles = std::list<value_handle>;
+  using handles = std::deque<handle>;
+  using value_handles = std::deque<value_handle>;
 
   queue();
   queue(const queue &que);
