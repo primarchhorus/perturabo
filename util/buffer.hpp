@@ -39,6 +39,7 @@
 #include <mutex>
 #include <vector>
 #include <deque>
+#include <optional>
 
 namespace util {
 /**
@@ -60,34 +61,25 @@ typedef std::lock_guard<lock_type> lock_guard;
 /**
  * @brief The buffer types.
  */
-template <typename T> using buffer_value_type = T;
-template <typename T> using buffer_value_ptr_type = buffer_value_type<T> *;
-template <typename T> using buffer_type = std::vector<T>;
-template <typename T> using buffer_ptr_type = buffer_type<T> *;
-template <typename T> using handle_type = std::shared_ptr<buffer_type<T>>;
-template <typename T>
-using handle_value_type = std::shared_ptr<buffer_value_type<T>>;
+template <typename T> using buffer_entity_type = T;
+template <typename T> using buffer_entity_ptr_type = buffer_entity_type<T> *;
+template <typename T> using handle_entity_type = std::shared_ptr<buffer_entity_type<T>>;
 
 /**
  * @brief The buffer pool to manage the buffer workers.
  */
 template <typename T> struct pool {
-  using buffer = buffer_type<T>;
-  using value = buffer_value_type<T>;
-  using value_ptr = buffer_value_ptr_type<T>;
-  using buffer_ptr = buffer_ptr_type<T>;
-  using handle = handle_type<T>;
-  using value_handle = handle_value_type<T>;
+  using entity = buffer_entity_type<T>;
+  using entity_ptr = buffer_entity_ptr_type<T>;
+  using entity_handle = handle_entity_type<T>;
 
   pool();
   ~pool();
 
-  void create(const size_t number, const size_t size);
-  void create_val_pool(const size_t number_, const size_t size_);
+  void create_entity_pool(const size_t number_, const size_t size_);
   void destroy();
 
-  handle request();
-  value_handle request_val_handle();
+  std::optional<entity_handle> request_entity_handle();
 
   bool valid() const { return number != 0; }
 
@@ -106,18 +98,13 @@ private:
   struct releaser {
     pool &pool_;
     releaser(pool &pool__) : pool_(pool__) {}
-    void operator()(buffer *buf) const { pool_.release(buf); }
-    void operator()(value *buf) const { pool_.release(buf); }
+    void operator()(entity *buf) const { pool_.release(buf); }
   };
 
-  void release(buffer_ptr buf);
-  void release(value_ptr val);
+  void release(entity_ptr val);
 
   std::atomic_size_t count_;
-
-  std::deque<buffer_ptr> buffers;
-  std::deque<value_ptr> values;
-
+  std::deque<entity_ptr> entities;
   lock_type lock;
 };
 
@@ -125,27 +112,21 @@ private:
  * @brief Buffer queue for allocating work to the workers.
  */
 template <typename T> struct queue {
-  using buffer_value_ptr = buffer_value_ptr_type<T>;
-  using value = buffer_value_type<T>;
-  using buffer = buffer_type<T>;
-  using buffer_ptr = buffer_ptr_type<T>;
-  using handle = handle_type<T>;
-  using value_handle = handle_value_type<T>;
+  using buffer_entity_ptr = buffer_entity_ptr_type<T>;
+  using entity = buffer_entity_type<T>;
+  using entity_handle = handle_entity_type<T>;
 
-  using handles = std::deque<handle>;
-  using value_handles = std::deque<value_handle>;
+  using entity_handles = std::deque<entity_handle>;
 
   queue();
   queue(const queue &que);
 
-  void push(handle buf);
-  void push(value_handle val);
-  handle pop();
-  value_handle pop_val();
+  void push(entity_handle val);
 
-  void copy(buffer &to);
-  void copy(value &to);
-  void copy(buffer_value_ptr to, const size_t count);
+  entity_handle pop_entity();
+
+  void copy(entity &to);
+  void copy(buffer_entity_ptr to, const size_t count);
 
   void compact();
 
@@ -159,11 +140,10 @@ template <typename T> struct queue {
   void output(std::ostream &out);
 
 private:
-  void copy_unprotected(buffer_value_ptr to, const size_t count);
-  void copy_unprotected(value to, const size_t count);
+  void copy_unprotected(buffer_entity_ptr to, const size_t count);
+  void copy_unprotected(entity to, const size_t count);
 
-  handles buffers;
-  value_handles values;
+  entity_handles entities;
   lock_type lock;
   std::atomic_size_t size_;
   std::atomic_size_t count_;
@@ -180,7 +160,7 @@ template <typename T> pool<T>::~pool() {
 }
 
 template <typename T>
-void pool<T>::create(const size_t number_, const size_t size_) {
+void pool<T>::create_entity_pool(const size_t number_, const size_t size_) {
   lock_guard guard(lock);
   if (valid()) {
     throw -1;
@@ -188,24 +168,8 @@ void pool<T>::create(const size_t number_, const size_t size_) {
   number = number_;
   size = size_;
   for (size_t n = 0; n < number; ++n) {
-    buffer_ptr buf = new buffer;
-    buf->reserve(size);
-    buffers.push_front(buf);
-  }
-  count_ = number;
-}
-
-template <typename T>
-void pool<T>::create_val_pool(const size_t number_, const size_t size_) {
-  lock_guard guard(lock);
-  if (valid()) {
-    throw -1;
-  }
-  number = number_;
-  size = size_;
-  for (size_t n = 0; n < number; ++n) {
-    value_ptr buf = new value;
-    values.push_front(buf);
+    entity_ptr buf = new entity;
+    entities.push_front(buf);
   }
   count_ = number;
 }
@@ -216,15 +180,10 @@ template <typename T> void pool<T>::destroy() {
     if (count_.load() != number) {
       throw error("pool destroy made while busy");
     }
-    while (!buffers.empty()) {
-      buffer_ptr buf = buffers.front();
+    while (!entities.empty()) {
+      entity_ptr buf = entities.front();
       delete buf;
-      buffers.pop_front();
-    }
-    while (!values.empty()) {
-      value_ptr buf = values.front();
-      delete buf;
-      values.pop_front();
+      entities.pop_front();
     }
     number = 0;
     size = 0;
@@ -232,38 +191,21 @@ template <typename T> void pool<T>::destroy() {
   }
 }
 
-template <typename T> handle_type<T> pool<T>::request() {
+template <typename T> std::optional<handle_entity_type<T>> pool<T>::request_entity_handle() {
   lock_guard guard(lock);
   if (empty()) {
-    throw error("no buffers available");
+    return std::nullopt;
   }
   count_--;
-  buffer_ptr buf = buffers.front();
-  buffers.pop_front();
-  return handle(buf, releaser(*this));
+  entity_ptr val = entities.front();
+  entities.pop_front();
+  return entity_handle(val, releaser(*this));
 }
 
-template <typename T> handle_value_type<T> pool<T>::request_val_handle() {
-  lock_guard guard(lock);
-  if (empty()) {
-    throw -1;
-  }
-  count_--;
-  value_ptr val = values.front();
-  values.pop_front();
-  return value_handle(val, releaser(*this));
-}
 
-template <typename T> void pool<T>::release(buffer_ptr buf) {
-  buf->clear();
+template <typename T> void pool<T>::release(entity_ptr buf) {
   lock_guard guard(lock);
-  buffers.push_front(buf);
-  count_++;
-}
-
-template <typename T> void pool<T>::release(value_ptr buf) {
-  lock_guard guard(lock);
-  values.push_front(buf);
+  entities.push_front(buf);
   count_++;
 }
 
@@ -273,59 +215,22 @@ template <typename T> void pool<T>::output(std::ostream &out) {
 
 template <typename T> queue<T>::queue() : size_(0), count_(0) {}
 
-template <typename T> queue<T>::queue(const queue &que) {
-  buffers = que.buffers;
-  size_ = que.size_.load();
-  count_ = que.count_.load();
-}
-
-template <typename T> void queue<T>::push(handle buf) {
-  if (buf->size() > 0) {
-    lock_guard guard(lock);
-    buffers.push_back(buf);
-    size_ += buf->size();
-    ++count_;
-  }
-}
-
-template <typename T> void queue<T>::push(value_handle val) {
+template <typename T> void queue<T>::push(entity_handle val) {
   lock_guard guard(lock);
-  values.push_back(val);
+  entities.push_back(val);
   size_ += sizeof(val);
   ++count_;
 }
 
-template <typename T> handle_type<T> queue<T>::pop() {
+template <typename T> handle_entity_type<T> queue<T>::pop_entity() {
   lock_guard guard(lock);
-  handle buf = buffers.front();
-  buffers.pop_front();
-  size_ -= buf->size();
-  --count_;
-  return buf;
-}
-
-template <typename T> handle_value_type<T> queue<T>::pop_val() {
-  lock_guard guard(lock);
-  value_handle val = values.front();
-  values.pop_front();
+  entity_handle val = entities.front();
+  entities.pop_front();
   --count_;
   return val;
 }
 
-template <typename T> void queue<T>::copy(buffer &to) {
-  lock_guard guard(lock);
-  /*
-   * If the `to` size is 0 copy all the available data
-   */
-  size_t count = to.size();
-  if (count == 0) {
-    count = size_.load();
-    to.resize(count);
-  }
-  copy_unprotected(to.data(), count);
-}
-
-template <typename T> void queue<T>::copy(value &to) {
+template <typename T> void queue<T>::copy(entity &to) {
   lock_guard guard(lock);
   /*
    * If the `to` size is 0 copy all the available data
@@ -335,52 +240,20 @@ template <typename T> void queue<T>::copy(value &to) {
 }
 
 template <typename T>
-void queue<T>::copy(buffer_value_ptr to, const size_t count) {
+void queue<T>::copy(buffer_entity_ptr to, const size_t count) {
   lock_guard guard(lock);
   copy_unprotected(to, count);
 }
 
 template <typename T>
-void queue<T>::copy_unprotected(buffer_value_ptr to, const size_t count) {
+void queue<T>::copy_unprotected(entity to, const size_t count) {
   if (count > size_.load()) {
     throw error("not enough data in queue");
   }
   std::cout << "copy_unprotected" << std::endl;
   auto to_move = count;
-  auto from_bi = buffers.begin();
-  while (to_move > 0 && from_bi != buffers.end()) {
-    auto from = *from_bi;
-    if (to_move >= from->size()) {
-      std::memcpy(to, from->data(), from->size() * sizeof(*to));
-      to += from->size();
-      to_move -= from->size();
-      size_ -= from->size();
-      count_--;
-      from->clear();
-    } else {
-      std::memcpy(to, from->data(), to_move);
-      std::move(from->begin() + to_move, from->end(), from->begin());
-      from->resize(from->size() - to_move);
-      to += from->size();
-      to_move = 0;
-      size_ -= to_move;
-    }
-    from_bi++;
-  }
-  if (from_bi != buffers.begin()) {
-    buffers.erase(buffers.begin(), from_bi);
-  }
-}
-
-template <typename T>
-void queue<T>::copy_unprotected(value to, const size_t count) {
-  if (count > size_.load()) {
-    throw error("not enough data in queue");
-  }
-  std::cout << "copy_unprotected" << std::endl;
-  auto to_move = count;
-  auto from_bi = values.begin();
-  while (to_move > 0 && from_bi != values.end()) {
+  auto from_bi = entities.begin();
+  while (to_move > 0 && from_bi != entities.end()) {
     auto from = *from_bi;
     if (to_move >= sizeof(*from)) {
       std::memcpy(&to, from, sizeof(*from) * sizeof(*to));
@@ -397,63 +270,14 @@ void queue<T>::copy_unprotected(value to, const size_t count) {
     }
     from_bi++;
   }
-  if (from_bi != values.begin()) {
-    values.erase(values.begin(), from_bi);
-  }
-}
-
-template <typename T> void queue<T>::compact() {
-  lock_guard guard(lock);
-  /*
-   * Erasing elements from the queue's container invalidates the
-   * iterators. After moving one or more buffers into another buffer and
-   * removing them we start again, so we have valid iterators.
-   */
-  bool rerun = true;
-  while (rerun) {
-    rerun = false;
-    auto to_bi = buffers.begin();
-    while (to_bi != buffers.end()) {
-      auto &to = *to_bi;
-      if (to->capacity() - to->size() > 0) {
-        auto erase_from = buffers.end();
-        auto erase_to = buffers.end();
-        auto to_move = to->capacity() - to->size();
-        auto from_bi = to_bi;
-        ++from_bi;
-        while (to_move > 0 && from_bi != buffers.end()) {
-          auto from = *from_bi;
-          if (to_move >= from->size()) {
-            to->insert(to->end(), from->begin(), from->end());
-            to_move -= from->size();
-            if (erase_from == buffers.end()) {
-              erase_from = from_bi;
-            }
-            from_bi++;
-            erase_to = from_bi;
-            count_--;
-            from->clear();
-          } else {
-            to->insert(to->end(), from->begin(), from->begin() + to_move);
-            from->erase(from->begin(), from->begin() + to_move);
-            to_move = 0;
-          }
-        }
-        if (erase_from != buffers.end()) {
-          buffers.erase(erase_from, erase_to);
-          rerun = true;
-          break;
-        }
-      }
-      to_bi++;
-    }
+  if (from_bi != entities.begin()) {
+    entities.erase(entities.begin(), from_bi);
   }
 }
 
 template <typename T> void queue<T>::flush() {
   lock_guard guard(lock);
-  buffers.clear();
-  values.clear();
+  entities.clear();
 }
 
 template <typename T> void queue<T>::output(std::ostream &out) {

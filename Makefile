@@ -18,7 +18,7 @@ CC = c++
 DEPFLAGS = -MT $@ -MMD -MP -MF $(patsubst %.o,%.d,$@)
 
 # define any compile-time flags
-CFLAGS = -Wall -g -w -std=c++2a $(DEPFLAGS)
+CFLAGS = -Wall -O1 -g -w -std=c++2a $(DEPFLAGS)
 
 # define any directories containing header files other than /usr/include
 #

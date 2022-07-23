@@ -43,11 +43,11 @@ void insert(int timeout) {
   long counter = 0;
   while (sum < loop_count) {
     check.fetch_add(1);
-    auto event_handle = topic->get_topic_event_handle();
+    auto event_handle = topic->get_topic_entity_handle();
     strcpy(event_handle->message, "message thingy");
     event_handle->event_id = timeout;
     event_handle->incr = 1;
-    topic->send_message(event_handle);
+    topic->send_entity(event_handle);
     sum = sum + 1;
     counter = counter + timeout;
   }

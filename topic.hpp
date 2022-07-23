@@ -32,6 +32,7 @@
 #include <thread>
 #include <tuple>
 #include <type_traits>
+#include <optional>
 
 namespace message_bus {
 
@@ -43,7 +44,7 @@ template <typename T> struct topic {
 
   topic(size_t buffer_size, run_mode mode_)
       : process_running(false), process_finished(true), mode(mode_) {
-    topic_message_pool.create_val_pool(buffer_size, buffer_size);
+    topic_message_pool.create_entity_pool(buffer_size, buffer_size);
     start();
   };
   topic(const topic &) = delete;
@@ -58,16 +59,16 @@ template <typename T> struct topic {
   void run();
   void start();
   void stop();
-  util::buffer::handle_value_type<T> request_val();
-  void push_event(util::buffer::handle_value_type<T> event);
-  void push_event(util::buffer::handle_value_type<T> event, run_mode mode);
-  util::buffer::handle_value_type<T> get_topic_event_handle();
-  void send_message(util::buffer::handle_value_type<T> j);
-  util::buffer::handle_value_type<T> pop_event();
+  std::optional<util::buffer::handle_entity_type<T>> request_entity();
+  void push_entity(util::buffer::handle_entity_type<T> entity);
+  void push_entity(util::buffer::handle_entity_type<T> entity, run_mode mode);
+  util::buffer::handle_entity_type<T> get_topic_entity_handle();
+  void send_entity(util::buffer::handle_entity_type<T> j);
+  util::buffer::handle_entity_type<T> pop_entity();
   bool get_queue_state();
   void trigger();
   void register_handler(
-      std::function<void(util::buffer::handle_value_type<T> handler)>);
+      std::function<void(util::buffer::handle_entity_type<T> handler)>);
 
 protected:
   util::buffer::pool<T> topic_message_pool;
@@ -79,7 +80,7 @@ protected:
   std::atomic_bool process_finished;
   std::thread process_thread;
   run_mode mode;
-  std::vector<std::function<void(util::buffer::handle_value_type<T>)>>
+  std::vector<std::function<void(util::buffer::handle_entity_type<T>)>>
       func_list;
 };
 
@@ -110,7 +111,7 @@ template <class T> void topic<T>::run() {
                                    // blah compiler complier, still though.
       break;
     }
-    util::buffer::handle_value_type<T> handle = pop_event();
+    util::buffer::handle_entity_type<T> handle = pop_entity();
     for (auto func : func_list) {
       func(handle);
     }
@@ -119,12 +120,12 @@ template <class T> void topic<T>::run() {
 }
 
 template <typename T>
-util::buffer::handle_value_type<T> topic<T>::request_val() {
-  return topic_message_pool.request_val_handle();
+std::optional<util::buffer::handle_entity_type<T>> topic<T>::request_entity() {
+  return topic_message_pool.request_entity_handle();
 }
 
 template <typename T>
-void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
+void topic<T>::push_entity(util::buffer::handle_entity_type<T> event) {
   topic_message_queue.push(event);
   if (mode == run_mode::stream) {
     object_in_queue.notify_one();
@@ -132,7 +133,7 @@ void topic<T>::push_event(util::buffer::handle_value_type<T> event) {
 }
 
 template <typename T>
-void topic<T>::push_event(util::buffer::handle_value_type<T> event,
+void topic<T>::push_entity(util::buffer::handle_entity_type<T> event,
                           run_mode mode) {
   topic_message_queue.push(event);
   if (mode == run_mode::stream) {
@@ -141,36 +142,37 @@ void topic<T>::push_event(util::buffer::handle_value_type<T> event,
 }
 
 template <typename T>
-util::buffer::handle_value_type<T> topic<T>::get_topic_event_handle() {
+util::buffer::handle_entity_type<T> topic<T>::get_topic_entity_handle() {
   bool retry = false;
   int retry_counter = 0;
   do {
-  try { // try vs if, compare later, bool if possibly quicker but only if
-        // exception is thrown alot, and thst only with a very low pool size and
-        // very fast push rate, bad config really
-    return request_val();
-  } catch (const int &e) {
-    std::unique_lock<std::mutex> pool_ready(mtx);
-    object_in_pool.wait_for(pool_ready, std::chrono::microseconds(2000),
-                            [this] { return !topic_message_pool.empty(); });
-    retry = true;
-    retry_counter += 1;
-  } catch (const std::exception &e) {
-    std::cout << e.what() << std::endl;
-  }
+      auto handle = request_entity();
+      if (handle)
+      {
+        return handle.value() ;
+      }
+      else
+      {
+        std::unique_lock<std::mutex> pool_ready(mtx);
+        object_in_pool.wait_for(pool_ready, std::chrono::microseconds(1000),
+                                [this]
+                                { return !topic_message_pool.empty(); });
+        retry = true;
+        retry_counter += 1;
+      }
   }while(retry);
 }
 
 template <typename T>
-void topic<T>::send_message(util::buffer::handle_value_type<T> j) {
-  push_event(j);
+void topic<T>::send_entity(util::buffer::handle_entity_type<T> j) {
+  push_entity(j);
   // if (mode == run_mode::stream) {
   //   std::this_thread::sleep_for(std::chrono::microseconds(1));
   // }
 }
 
-template <class T> util::buffer::handle_value_type<T> topic<T>::pop_event() {
-  return topic_message_queue.pop_val();
+template <class T> util::buffer::handle_entity_type<T> topic<T>::pop_entity() {
+  return topic_message_queue.pop_entity();
 }
 
 template <class T> bool topic<T>::get_queue_state() {
@@ -181,9 +183,9 @@ template <class T> void topic<T>::trigger() { object_in_queue.notify_one(); }
 
 template <class T>
 void topic<T>::register_handler(
-    std::function<void(util::buffer::handle_value_type<T>)> handler) {
+    std::function<void(util::buffer::handle_entity_type<T>)> handler) {
   func_list.push_back(
-      std::function<void(util::buffer::handle_value_type<T>)>(handler));
+      std::function<void(util::buffer::handle_entity_type<T>)>(handler));
 }
 
 } // namespace message_bus
