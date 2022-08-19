@@ -29,33 +29,35 @@
 #include <thread>
 #include <unistd.h>
 
-using manager = message_bus::topic_manager<message_bus::event_base>;
+auto manager = message_bus::create_manager<message_bus::event_base>();
 
 std::atomic<long long> final_sum{0};
 std::atomic<long long> check{0};
-int loop_count = 10000000;
+int loop_count = 6219200;
 
 void insert(int timeout) {
   std::string t_name = "test_topic";
-  auto topic = manager::instance().get_topic(t_name);
+  auto topic = manager->get_topic(t_name);
 
   long sum = 0;
   long counter = 0;
   while (sum < loop_count) {
     check.fetch_add(1);
     auto event_handle = topic->get_topic_entity_handle();
-    strcpy(event_handle->message, "message thingy");
+    // strcpy(event_handle->message, "message thingy");
     event_handle->event_id = timeout;
     event_handle->incr = 1;
+    // event_handle->counter = counter;
     topic->send_entity(event_handle);
     sum = sum + 1;
     counter = counter + timeout;
+    // std::cout << "send " << event_handle->event_id << " " << event_handle->incr << " " << event_handle->counter << std::endl;
   }
 }
 
 void trigger_loop() {
   std::string t_name = "test_topic";
-  auto topic = manager::instance().get_topic(t_name);
+  auto topic = manager->get_topic(t_name);
   int frame_count = 0;
   while (frame_count <= loop_count) {
     std::this_thread::sleep_for(std::chrono::microseconds(16660));
@@ -67,12 +69,12 @@ void trigger_loop() {
 
 void handler(std::shared_ptr<message_bus::event_base> message) {
   final_sum.fetch_add(message->incr);
-  int thread_id = message->event_id;
+  // std::cout << "recieve " << message->event_id << " " << message->incr << " " << message->counter << std::endl;
 }
 
 void run() {
-  manager::instance().create_topic("test_topic", 4096, message_bus::run_mode::stream);
-  auto topic = manager::instance().get_topic("test_topic");
+  manager->create_topic("test_topic", 8192, message_bus::run_mode::stream);
+  auto topic = manager->get_topic("test_topic");
   std::function<void(std::shared_ptr<message_bus::event_base>)> f = handler;
   topic->register_handler(f);
   auto start = std::chrono::system_clock::now();
@@ -81,28 +83,31 @@ void run() {
   std::thread th3(insert, 3);
   std::thread th4(insert, 4);
   std::thread th5(insert, 5);
-  std::thread th6(insert, 6);
-  std::thread th7(insert, 7);
-  std::thread th8(insert, 8);
-  std::thread th9(insert, 9);
-  std::thread th10(insert, 10);
+  // std::thread th6(insert, 6);
+  // std::thread th7(insert, 7);
+  // std::thread th8(insert, 8);
+  // std::thread th9(insert, 9);
+  // std::thread th10(insert, 10);
 
   th1.join();
   th2.join();
   th3.join();
   th4.join();
   th5.join();
-  th6.join();
-  th7.join();
-  th8.join();
-  th9.join();
-  th10.join();
+  // th6.join();
+  // th7.join();
+  // th8.join();
+  // th9.join();
+  // th10.join();
 
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> diff = end - start;
   topic->stop();
+  double perc = (double)final_sum.load() / check.load() ;
   std::cout << "receive sum " << final_sum.load() << " send sum "
-            << check.load() << " percent receieved: " << (100 * (  check.load() / final_sum.load())) << "% " << " messages per second: " << final_sum.load() / diff.count() << std::endl;
+            << check.load() << " percent receieved: " << (100 * ( perc )) << "% " << " messages per second: " << final_sum.load() / diff.count() << std::endl;
 }
 
-int main(int argc, char *argv[]) { run(); }
+int main(int argc, char *argv[]) { 
+  run(); 
+}

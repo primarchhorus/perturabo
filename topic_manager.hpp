@@ -30,12 +30,13 @@
 #define TOPIC_MANAGER_H
 
 namespace message_bus {
-template <class T> struct topic_manager {
+template <typename T> using topics_map = std::map<std::string, std::shared_ptr<message_bus::topic<T>>>;
+template <typename T> struct topic_manager {
 
-  static topic_manager& instance(){
-    static topic_manager instance;
-    return instance;
-  }
+  // static topic_manager& instance(){
+  //   static topic_manager instance;
+  //   return instance;
+  // }
   topic_manager()= default;
   topic_manager(const topic_manager&)= delete;
   topic_manager& operator=(const topic_manager&)= delete;
@@ -54,7 +55,8 @@ template <class T> struct topic_manager {
   void  remove_topic(std::string topic_name);
 
 private:
-  std::map<std::string, std::shared_ptr<message_bus::topic<T>>> topics;
+  topics_map<T> topics; 
+  // std::map<std::string, std::shared_ptr<message_bus::topic<T>>> topics;
 };
 
 template <typename T>
@@ -75,6 +77,11 @@ topic_manager<T>::get_topic(std::string topic_name) {
   } else {
     throw std::runtime_error("topic " + topic_name + " not found.");
   }
+}
+
+template <typename T>
+std::unique_ptr<topic_manager<T>> create_manager() {
+  return std::make_unique<topic_manager<T>>();
 }
 
 } // namespace message_bus

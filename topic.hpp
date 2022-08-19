@@ -23,6 +23,7 @@
 #define TOPIC_H
 
 #include "util/buffer.hpp"
+#include "entity_fifo.hpp"
 
 #include <json/single_include/nlohmann/json.hpp>
 
@@ -43,38 +44,44 @@ enum run_mode { stream, trigger };
 template <typename T> struct topic {
 
   topic(size_t buffer_size, run_mode mode_)
-      : process_running(false), process_finished(true), mode(mode_) {
-    topic_message_pool.create_entity_pool(buffer_size, buffer_size);
+      : circular_buffer(4096), process_running(false), process_finished(true), mode(mode_) {
+  
     start();
   };
   topic(const topic &) = delete;
   ~topic() {
+    while(!topic_entity_queue.empty()) {
+      
+    }
     if (process_thread.joinable()) {
       process_thread.join();
     }
-    topic_message_queue.flush();
-    topic_message_pool.destroy();
+
+    topic_entity_queue.flush();
   };
 
-  void run();
   void start();
   void stop();
+
   std::optional<util::buffer::handle_entity_type<T>> request_entity();
-  void push_entity(util::buffer::handle_entity_type<T> entity);
-  void push_entity(util::buffer::handle_entity_type<T> entity, run_mode mode);
   util::buffer::handle_entity_type<T> get_topic_entity_handle();
-  void send_entity(util::buffer::handle_entity_type<T> j);
-  util::buffer::handle_entity_type<T> pop_entity();
-  bool get_queue_state();
+  void send_entity(util::buffer::handle_entity_type<T> entity);
   void trigger();
   void register_handler(
       std::function<void(util::buffer::handle_entity_type<T> handler)>);
 
+private:
+  void run();
+  void push_entity(util::buffer::handle_entity_type<T> entity);
+  void push_entity(util::buffer::handle_entity_type<T> entity, run_mode mode);
+  util::buffer::handle_entity_type<T> pop_entity();
+
 protected:
-  util::buffer::pool<T> topic_message_pool;
-  util::buffer::queue<T> topic_message_queue;
-  std::condition_variable object_in_queue;
-  std::condition_variable object_in_pool;
+  util::buffer::pool<T> topic_entity_pool;
+  message_bus::entity_fifo<T> circular_buffer;
+  util::buffer::queue<T> topic_entity_queue;
+  std::condition_variable entity_in_queue;
+  std::condition_variable entity_in_pool;
   std::mutex mtx;
   std::atomic_bool process_running;
   std::atomic_bool process_finished;
@@ -95,20 +102,18 @@ template <typename T> void topic<T>::start() {
 }
 
 template <typename T> void topic<T>::stop() {
-  while (!get_queue_state()) {
+  while (!topic_entity_queue.empty()) {
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
   process_running = false;
 }
 
 template <class T> void topic<T>::run() {
-  std::unique_lock<std::mutex> L(mtx);
+  std::unique_lock<std::mutex> entity_in_queue_mutex(mtx);
   while (!process_finished) {
-    object_in_queue.wait_for(L, std::chrono::milliseconds(100),
-                             [this] { return !topic_message_queue.empty(); });
-    if (!process_running.load()) { // This sucks evaluating this each iteration
-                                   // but not sure of a better way out, blah
-                                   // blah compiler complier, still though.
+    entity_in_queue.wait_for(entity_in_queue_mutex, std::chrono::milliseconds(100),
+                             [this] { return !topic_entity_queue.empty(); });
+    if (!process_running.load()) { 
       break;
     }
     util::buffer::handle_entity_type<T> handle = pop_entity();
@@ -121,23 +126,24 @@ template <class T> void topic<T>::run() {
 
 template <typename T>
 std::optional<util::buffer::handle_entity_type<T>> topic<T>::request_entity() {
-  return topic_message_pool.request_entity_handle();
+  // return topic_entity_pool.request_entity_handle();
+  return circular_buffer.request_entity_handle();
 }
 
 template <typename T>
 void topic<T>::push_entity(util::buffer::handle_entity_type<T> event) {
-  topic_message_queue.push(event);
+  topic_entity_queue.push(event);
   if (mode == run_mode::stream) {
-    object_in_queue.notify_one();
+    entity_in_queue.notify_one();
   }
 }
 
 template <typename T>
 void topic<T>::push_entity(util::buffer::handle_entity_type<T> event,
                           run_mode mode) {
-  topic_message_queue.push(event);
+  topic_entity_queue.push(event);
   if (mode == run_mode::stream) {
-    object_in_queue.notify_one();
+    entity_in_queue.notify_one();
   }
 }
 
@@ -154,9 +160,9 @@ util::buffer::handle_entity_type<T> topic<T>::get_topic_entity_handle() {
       else
       {
         std::unique_lock<std::mutex> pool_ready(mtx);
-        object_in_pool.wait_for(pool_ready, std::chrono::microseconds(1000),
+        entity_in_pool.wait_for(pool_ready, std::chrono::microseconds(1),
                                 [this]
-                                { return !topic_message_pool.empty(); });
+                                { return circular_buffer.empty(); });
         retry = true;
         retry_counter += 1;
       }
@@ -164,22 +170,15 @@ util::buffer::handle_entity_type<T> topic<T>::get_topic_entity_handle() {
 }
 
 template <typename T>
-void topic<T>::send_entity(util::buffer::handle_entity_type<T> j) {
-  push_entity(j);
-  // if (mode == run_mode::stream) {
-  //   std::this_thread::sleep_for(std::chrono::microseconds(1));
-  // }
+void topic<T>::send_entity(util::buffer::handle_entity_type<T> entity) {
+  push_entity(entity);
 }
 
 template <class T> util::buffer::handle_entity_type<T> topic<T>::pop_entity() {
-  return topic_message_queue.pop_entity();
+  return topic_entity_queue.pop_entity();
 }
 
-template <class T> bool topic<T>::get_queue_state() {
-  return topic_message_queue.empty();
-}
-
-template <class T> void topic<T>::trigger() { object_in_queue.notify_one(); }
+template <class T> void topic<T>::trigger() { entity_in_queue.notify_one(); }
 
 template <class T>
 void topic<T>::register_handler(

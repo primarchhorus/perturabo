@@ -23,11 +23,16 @@
 #ifndef EVENT_H
 #define EVENT_H
 
+#include <cstdint>
+
+constexpr uint16_t CACHE_LINE_SIZE = 64;
+
 namespace message_bus {
-struct alignas(64) event_base {
+struct alignas(CACHE_LINE_SIZE) event_base {
   char message[16];
   int event_id;
   int incr;
+  int counter;
   bool handled;
 };
 } // namespace message_bus
